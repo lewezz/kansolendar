@@ -1,6 +1,6 @@
 # Persistencia SQLite: diseño inicial
 
-Estado: esquema conceptual, **sin DDL ni migraciones ejecutables**. Depende de la aprobación de [ADR-0004](adr/0004-encryption.md). SQLite del sistema enlazado desde SDK; sin ORM, sin SwiftData, sin extensión cargable.
+Estado: el esquema v1 tiene DDL y migración inicial ejecutables en `SQLiteVaultDatabase`; CRUD de envelopes, constraints/FK, transacciones de migración y rechazo de versiones futuras tienen tests con datos sintéticos. La app aún no conecta esta base con una bóveda real: faltan composición/repositorios, ruta de producción con permisos restrictivos, Keychain firmado, backup y gates de seguridad. No usar datos reales. SQLite del sistema se enlaza mediante un system-library target local; sin ORM, sin SwiftData, sin dependencia de terceros ni extensión cargable.
 
 ## Ubicación y exposición
 
@@ -31,7 +31,7 @@ Reminder/Attendee/Tag/Attachment: sin tablas en MVP.
 
 UUID: BLOB de 16 bytes, representación estable. Enteros: INTEGER con signo (64 bits). Texto sensible: UTF-8 **dentro** de payload cifrado, no TEXT de SQLite. `payload_envelope` es BLOB NOT NULL con layout fijo `magic[4] | version[1] | nonce[12] | ciphertext[n] | tag[16]`, máximo 131105 bytes según [security.md](security.md). Cada columna obligatoria se define NOT NULL. Las PK BLOB deben declarar NOT NULL explícito; no confiar en peculiaridades históricas de SQLite.
 
-Tipos y longitudes se verifican con constraints; usar STRICT si está disponible en todas las versiones mínimas admitidas, o constraints de `typeof` equivalentes. La versión de SQLite del SDK no se asume constante entre macOS: probar capacidades y no depender de extensiones opcionales. No usar JSON1 ni FTS.
+Tipos y longitudes se verifican con constraints; usar STRICT si está disponible en todas las versiones mínimas admitidas, o constraints de `typeof` equivalentes. La versión de SQLite del SDK no se asume constante entre macOS: probar capacidades y no depender de extensiones opcionales. No usar JSON1 ni FTS. El target `CSQLite` solo incluye `<sqlite3.h>` del SDK y enlaza `libsqlite3`; el proyecto no añade wrapper/ORM ni descarga código.
 
 ### vault_meta
 
@@ -104,7 +104,7 @@ El binding SQL contiene ciphertext, por lo que journals, páginas libres y backu
 
 Versiones separadas: esquema físico entero monotónico; envelope criptográfico; payload de cada tipo; versión del perfil .ics independiente. user_version y schema_version deben coincidir tras commit. Nunca meter el número de esquema mutable en AAD de cada fila: la AAD usa la versión de envelope y las identidades descritas en [seguridad](security.md).
 
-Secuencia futura:
+Secuencia de migración:
 
 1. Bloquear operaciones de usuario. Validar encabezado, capacidades y espacio libre; no migrar archivo con versión más nueva.
 2. Obtener clave y autenticar. Crear backup consistente de ciphertext y comprobar apertura; mantenerlo separado de la clave.
@@ -112,6 +112,8 @@ Secuencia futura:
 4. Si una migración necesita descifrar, hacerlo en memoria y reencriptar antes de SQL, con nonce nuevo; aplicar invariantes y comparar conteos.
 5. Comprobar integridad/FK, autenticación de registros y contratos de dominio. Commit únicamente con resultados válidos; reconstruir índice RAM.
 6. Ante error/crash, rollback/recuperación del journal; conservar original/copia. Nunca reset destructivo, saltar migración o borrar evidencia automáticamente.
+
+La migración implementada cubre únicamente la creación inicial de un archivo vacío (`user_version` 0 → 1) dentro de `BEGIN IMMEDIATE`/`COMMIT`. Un conflicto o fallo revierte el esquema; una versión futura se rechaza sin mutación. Todavía no hay migraciones de tablas con datos ni estrategia staging multiarchivo; deben añadirse antes de que exista una versión distribuida de la base.
 
 Para transformaciones futuras demasiado grandes, diseñar migración a un archivo nuevo de ciphertext con sustitución atómica; no improvisarla al alcanzar el límite. Downgrade no soportado: conservar archivo y pedir versión compatible o restauración elegida. Retener copia previa hasta un arranque y verificación correctos; limpieza controlada de copias no elimina Time Machine.
 

@@ -32,6 +32,8 @@ Ejecutar lógica en paquete local; usar xcodebuild en integración; las pruebas 
 | Parser T26 — solo futuro | Byte fuzz, UTF-8, nesting, líneas gigantes, quotes, escapes, URLs, attachments, loops RRULE | Se exigirá si se autoriza importación; no gate del MVP |
 | UI | Crear/editar/borrar, zona/all-day, cancelar instancia, bloquear, error de disco, selección de exportación, recovery | Flujos accesibles por teclado y VoiceOver; no comando/asociación/drag-in de importación |
 
+**Cobertura ya implementada:** el paquete prueba migración inicial/repetida y rollback, rechazo de versión futura, metadata, envelopes opacos, foreign keys restrict/cascade, CRUD de eventos, límites de tamaño, integridad y una escritura concurrente serializada. También escanea el archivo temporal por un sentinel plaintext. No incluye todavía reopen con repositorios, concurrencia de transacciones multioperación ni prueba real de ACL Keychain; esos gates siguen pendientes.
+
 ## Pruebas específicas de privacidad
 
 **P01 — Red (T16/T26/T30).** Inspección estática de imports/APIs y entitlements finales más ejecución observada por proceso, con y sin conectividad. Cubrir todos los flujos del MVP, contenido con URLs en notas/ubicación y backups hostiles. Verificar que intentar abrir un .ics no active ningún importador del producto. Las entradas ALTREP/TZURL y demás corpus de importación se reservan para esa función futura. Resultado: cero intentos DNS/TCP/UDP de app y cero delegación de apertura remota. Control negativo de sandbox en test host independiente. Captura global del Mac sin atribución no permite culpar o absolver a Kansolendar.
