@@ -63,6 +63,48 @@ struct SQLiteVaultRepositoryTests {
         #expect(try await database.metadata()?.vaultID == vaultID)
     }
 
+    @Test("recurrence cancellations round trip encrypted and change expansion")
+    func recurrenceCancellationsPersist() async throws {
+        let database = try SQLiteVaultDatabase(path: ":memory:", keyStore: FixtureVaultKeyStore())
+        _ = try await database.createVault()
+        let calendar = try LocalCalendar(name: "Repeating", defaultTimeZone: TimeZoneID("UTC"))
+        try await database.saveCalendar(calendar)
+        let start = Instant(unixSeconds: 0)
+        let event = try Event(
+            calendarID: calendar.id,
+            uid: "daily-series",
+            title: "Daily standup",
+            time: .utc(try TimedEventTime(start: start, durationSeconds: 60))
+        )
+        let rule = try RecurrenceRule(frequency: .daily, end: .count(5))
+        let cancelledStart = Instant(unixSeconds: 86_400)
+        let cancellation = EventOccurrenceKey(eventID: event.id, originalStart: .instant(cancelledStart))
+
+        try await database.saveEvent(event, recurrence: rule, cancellations: [cancellation])
+        let stored = try #require(try await database.events().first)
+        #expect(stored.cancellations == [cancellation])
+        let series = try RecurringSeries(event: stored.event, rule: try #require(stored.recurrence), cancellations: stored.cancellations)
+        let query = try EventTimeRange.instant(InstantRange(
+            start: Instant(unixSeconds: 0),
+            endExclusive: Instant(unixSeconds: 5 * 86_400)
+        ))
+        let occurrences = try RecurrenceEngine().expand(series, in: query)
+        #expect(occurrences.count == 4)
+        #expect(!occurrences.contains { $0.key.originalStart == .instant(cancelledStart) })
+
+        let wrongSeriesKey = EventOccurrenceKey(eventID: UUID(), originalStart: .instant(cancelledStart))
+        do {
+            try await database.saveEvent(event, recurrence: rule, cancellations: [wrongSeriesKey])
+            Issue.record("A cancellation belonging to another event must be rejected")
+        } catch let error as DomainValidationError {
+            #expect(error == .invalidRecurrence)
+        }
+        #expect(try await database.events().first?.cancellations == [cancellation])
+
+        try await database.saveEvent(event, recurrence: rule)
+        #expect(try await database.events().first?.cancellations.isEmpty == true)
+    }
+
     @Test("missing key requires recovery and user cancellation stays locked")
     func missingAndCancelledKeysFailClosed() async throws {
         let keyStore = FixtureVaultKeyStore()

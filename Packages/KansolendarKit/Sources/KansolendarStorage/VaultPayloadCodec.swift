@@ -10,10 +10,12 @@ internal enum VaultPayloadCodecError: Error, Equatable, Sendable {
 public struct VaultEvent: Sendable, Equatable {
     public let event: Event
     public let recurrence: RecurrenceRule?
+    public let cancellations: Set<EventOccurrenceKey>
 
-    public init(event: Event, recurrence: RecurrenceRule?) {
+    public init(event: Event, recurrence: RecurrenceRule?, cancellations: Set<EventOccurrenceKey> = []) {
         self.event = event
         self.recurrence = recurrence
+        self.cancellations = cancellations
     }
 }
 
@@ -67,7 +69,27 @@ internal enum VaultPayloadCodec {
         ))
     }
 
-    static func decodeEvent(_ data: Data, id: UUID, calendarID: UUID) throws -> VaultEvent {
+    static func encode(_ cancellation: EventCancellation) throws -> Data {
+        try encode(CancellationPayload(version: currentVersion, originalStart: StoredEventStart(cancellation.key.originalStart)))
+    }
+
+    static func decodeCancellation(_ data: Data, eventID: UUID) throws -> EventCancellation {
+        let payload = try decode(CancellationPayload.self, from: data)
+        guard payload.version == currentVersion else {
+            throw VaultPayloadCodecError.unsupportedVersion(payload.version)
+        }
+        return EventCancellation(key: EventOccurrenceKey(
+            eventID: eventID,
+            originalStart: try payload.originalStart.domainValue()
+        ))
+    }
+
+    static func decodeEvent(
+        _ data: Data,
+        id: UUID,
+        calendarID: UUID,
+        cancellations: Set<EventOccurrenceKey> = []
+    ) throws -> VaultEvent {
         let payload = try decode(EventPayload.self, from: data)
         guard payload.version == currentVersion else {
             throw VaultPayloadCodecError.unsupportedVersion(payload.version)
@@ -93,9 +115,11 @@ internal enum VaultPayloadCodec {
                 revision: payload.revision
             )
             if let recurrence {
-                _ = try RecurringSeries(event: event, rule: recurrence)
+                _ = try RecurringSeries(event: event, rule: recurrence, cancellations: cancellations)
+            } else if !cancellations.isEmpty {
+                throw VaultPayloadCodecError.invalidPayload
             }
-            return VaultEvent(event: event, recurrence: recurrence)
+            return VaultEvent(event: event, recurrence: recurrence, cancellations: cancellations)
         } catch {
             throw VaultPayloadCodecError.invalidPayload
         }
@@ -119,6 +143,65 @@ internal enum VaultPayloadCodec {
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {
+            throw VaultPayloadCodecError.invalidPayload
+        }
+    }
+}
+
+private struct CancellationPayload: Codable, Sendable {
+    let version: Int
+    let originalStart: StoredEventStart
+}
+
+private struct StoredEventStart: Codable, Sendable {
+    let kind: String
+    let civilDate: StoredDate?
+    let unixSeconds: Int64?
+    let localDateTime: StoredLocalDateTime?
+    let timeZoneID: String?
+
+    init(_ value: EventStart) {
+        switch value {
+        case let .civil(date):
+            kind = "civil"
+            civilDate = StoredDate(date)
+            unixSeconds = nil
+            localDateTime = nil
+            timeZoneID = nil
+        case let .instant(instant):
+            kind = "instant"
+            civilDate = nil
+            unixSeconds = instant.unixSeconds
+            localDateTime = nil
+            timeZoneID = nil
+        case let .zoned(local, zone):
+            kind = "zoned"
+            civilDate = nil
+            unixSeconds = nil
+            localDateTime = StoredLocalDateTime(local)
+            timeZoneID = zone.identifier
+        }
+    }
+
+    func domainValue() throws -> EventStart {
+        switch kind {
+        case "civil":
+            guard let civilDate, unixSeconds == nil, localDateTime == nil, timeZoneID == nil else {
+                throw VaultPayloadCodecError.invalidPayload
+            }
+            return .civil(try civilDate.domainValue())
+        case "instant":
+            guard let unixSeconds, civilDate == nil, localDateTime == nil, timeZoneID == nil else {
+                throw VaultPayloadCodecError.invalidPayload
+            }
+            return .instant(Instant(unixSeconds: unixSeconds))
+        case "zoned":
+            guard let localDateTime, let timeZoneID,
+                  civilDate == nil, unixSeconds == nil else {
+                throw VaultPayloadCodecError.invalidPayload
+            }
+            return .zoned(try localDateTime.domainValue(), try TimeZoneID(timeZoneID))
+        default:
             throw VaultPayloadCodecError.invalidPayload
         }
     }

@@ -77,6 +77,12 @@ internal struct VaultEventRecord: Sendable, Equatable {
     let envelope: Data
 }
 
+internal struct VaultExceptionRecord: Sendable, Equatable {
+    let id: UUID
+    let eventID: UUID
+    let envelope: Data
+}
+
 /// Serializes access to one SQLite connection. Public-facing storage must pass only
 /// UUID relationships and authenticated envelopes, never plaintext business values.
 internal actor SQLiteVaultDatabase {
@@ -234,7 +240,11 @@ internal actor SQLiteVaultDatabase {
         try saveCalendar(id: calendar.id, envelope: envelope)
     }
 
-    func saveEvent(_ event: Event, recurrence: RecurrenceRule? = nil) throws {
+    func saveEvent(
+        _ event: Event,
+        recurrence: RecurrenceRule? = nil,
+        cancellations: Set<EventOccurrenceKey> = []
+    ) throws {
         let generation = try unlockedGeneration()
         let hasDuplicateUID = try events().contains { existing in
             existing.event.id != event.id &&
@@ -242,9 +252,16 @@ internal actor SQLiteVaultDatabase {
                 existing.event.uid == event.uid
         }
         guard !hasDuplicateUID else { throw VaultStorageError.duplicateUID }
+        if let recurrence {
+            _ = try RecurringSeries(event: event, rule: recurrence, cancellations: cancellations)
+        } else if !cancellations.isEmpty {
+            throw DomainValidationError.invalidRecurrence
+        }
+        let vaultID = try currentVaultID()
+        let keyID = try currentKeyID()
         let context = PayloadContext(
-            vaultID: try currentVaultID(),
-            keyID: try currentKeyID(),
+            vaultID: vaultID,
+            keyID: keyID,
             recordKind: .event,
             recordID: event.id,
             parentID: event.calendarID
@@ -254,7 +271,35 @@ internal actor SQLiteVaultDatabase {
             context: context,
             expectedGeneration: generation
         )
-        try saveEvent(id: event.id, calendarID: event.calendarID, envelope: envelope)
+        let encryptedExceptions = try cancellations.map { key -> (UUID, Data) in
+            let cancellation = EventCancellation(key: key)
+            let exceptionID = UUID()
+            let exceptionContext = PayloadContext(
+                vaultID: vaultID,
+                keyID: keyID,
+                recordKind: .eventException,
+                recordID: exceptionID,
+                parentID: event.id
+            )
+            return (exceptionID, try keySession.seal(
+                VaultPayloadCodec.encode(cancellation),
+                context: exceptionContext,
+                expectedGeneration: generation
+            ))
+        }
+
+        try connection.execute("BEGIN IMMEDIATE")
+        do {
+            try saveEvent(id: event.id, calendarID: event.calendarID, envelope: envelope)
+            try deleteExceptions(eventID: event.id)
+            for (exceptionID, exceptionEnvelope) in encryptedExceptions {
+                try insertException(id: exceptionID, eventID: event.id, envelope: exceptionEnvelope)
+            }
+            try connection.execute("COMMIT")
+        } catch {
+            try? connection.execute("ROLLBACK")
+            throw error
+        }
     }
 
     func calendars() throws -> [LocalCalendar] {
@@ -291,7 +336,29 @@ internal actor SQLiteVaultDatabase {
                     parentID: record.calendarID
                 )
                 let payload = try keySession.open(record.envelope, context: context, expectedGeneration: generation)
-                return try VaultPayloadCodec.decodeEvent(payload, id: record.id, calendarID: record.calendarID)
+                let base = try VaultPayloadCodec.decodeEvent(payload, id: record.id, calendarID: record.calendarID)
+                let cancellations = try exceptionRecords(eventID: record.id).reduce(into: Set<EventOccurrenceKey>()) { result, exception in
+                    let exceptionContext = PayloadContext(
+                        vaultID: vaultID,
+                        keyID: keyID,
+                        recordKind: .eventException,
+                        recordID: exception.id,
+                        parentID: record.id
+                    )
+                    let exceptionPayload = try keySession.open(
+                        exception.envelope,
+                        context: exceptionContext,
+                        expectedGeneration: generation
+                    )
+                    let cancellation = try VaultPayloadCodec.decodeCancellation(exceptionPayload, eventID: record.id)
+                    result.insert(cancellation.key)
+                }
+                if let recurrence = base.recurrence {
+                    _ = try RecurringSeries(event: base.event, rule: recurrence, cancellations: cancellations)
+                } else if !cancellations.isEmpty {
+                    throw VaultPayloadCodecError.invalidPayload
+                }
+                return VaultEvent(event: base.event, recurrence: base.recurrence, cancellations: cancellations)
             }
         } catch {
             return try failClosed(error)
@@ -413,6 +480,34 @@ internal actor SQLiteVaultDatabase {
         try bind(id, to: statement, at: 1)
         try bind(eventID, to: statement, at: 2)
         try bind(envelope, to: statement, at: 3)
+        try stepDone(statement)
+    }
+
+    func exceptionRecords(eventID: UUID) throws -> [VaultExceptionRecord] {
+        try validate(id: eventID)
+        let statement = try connection.prepare(
+            "SELECT id, event_id, payload_envelope FROM event_exceptions WHERE event_id = ?1 ORDER BY id"
+        )
+        defer { sqlite3_finalize(statement) }
+        try bind(eventID, to: statement, at: 1)
+        var records: [VaultExceptionRecord] = []
+        while true {
+            let status = sqlite3_step(statement)
+            if status == SQLITE_DONE { return records }
+            guard status == SQLITE_ROW else { throw connection.failure(status) }
+            records.append(VaultExceptionRecord(
+                id: try uuidColumn(statement, index: 0),
+                eventID: try uuidColumn(statement, index: 1),
+                envelope: try dataColumn(statement, index: 2)
+            ))
+        }
+    }
+
+    func deleteExceptions(eventID: UUID) throws {
+        try validate(id: eventID)
+        let statement = try connection.prepare("DELETE FROM event_exceptions WHERE event_id = ?1")
+        defer { sqlite3_finalize(statement) }
+        try bind(eventID, to: statement, at: 1)
         try stepDone(statement)
     }
 

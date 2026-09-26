@@ -199,6 +199,8 @@ private final class VaultViewModel {
             "Las reglas horarias del sistema cambiaron; revisa las horas guardadas antes de editarlas."
         case .unlockInProgress:
             "Ya hay una solicitud de autenticación en curso."
+        case .invalidInput:
+            "Los datos de la operación no son válidos. No se ha modificado el calendario."
         case .storageUnavailable:
             "El almacén local no está disponible. No se ha mostrado información parcial."
         }

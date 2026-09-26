@@ -25,6 +25,7 @@ public enum VaultError: Error, Sendable, Equatable {
     case duplicateUID
     case timeZoneRulesChanged
     case unlockInProgress
+    case invalidInput
 }
 
 /// Public app-facing boundary for the local encrypted vault. It exposes domain values
@@ -83,9 +84,13 @@ public actor KansolendarVault {
         }
     }
 
-    public func save(_ event: Event, recurrence: RecurrenceRule? = nil) async throws {
+    public func save(
+        _ event: Event,
+        recurrence: RecurrenceRule? = nil,
+        cancellations: Set<EventOccurrenceKey> = []
+    ) async throws {
         do {
-            try await storage.saveEvent(event, recurrence: recurrence)
+            try await storage.saveEvent(event, recurrence: recurrence, cancellations: cancellations)
         } catch {
             throw Self.map(error)
         }
@@ -164,8 +169,7 @@ public actor KansolendarVault {
              SQLiteVaultError.invalidEnvelope,
              PayloadEnvelopeError.malformed,
              PayloadEnvelopeError.authenticationFailed,
-             PayloadEnvelopeError.payloadTooLarge,
-             VaultPayloadCodecError.invalidPayload:
+             PayloadEnvelopeError.payloadTooLarge:
             .corruptVault
         case SQLiteVaultError.unsupportedSchemaVersion,
              PayloadEnvelopeError.unsupportedVersion,
@@ -179,6 +183,8 @@ public actor KansolendarVault {
             .timeZoneRulesChanged
         case VaultStorageError.unlockInProgress, VaultStorageError.unlockSuperseded:
             .unlockInProgress
+        case is DomainValidationError, VaultPayloadCodecError.invalidPayload:
+            .invalidInput
         default:
             .storageUnavailable
         }

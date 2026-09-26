@@ -27,6 +27,8 @@ Cada fila de negocio tiene envelope AEAD; no tabla por ocurrencia.
 Reminder/Attendee/Tag/Attachment: sin tablas en MVP.
 ```
 
+Las cancelaciones de ocurrencias se guardan como sobres AEAD separados en `event_exceptions`. El `event_id` visible solo conserva la relación; el `EventStart` original permanece cifrado y autenticado en el contexto del sobre. Al reemplazar una serie y sus cancelaciones, ambas escrituras se confirman en una transacción SQLite corta; una entrada inválida o un fallo revierte el conjunto.
+
 ## Convenciones comunes
 
 UUID: BLOB de 16 bytes, representación estable. Enteros: INTEGER con signo (64 bits). Texto sensible: UTF-8 **dentro** de payload cifrado, no TEXT de SQLite. `payload_envelope` es BLOB NOT NULL con layout fijo `magic[4] | version[1] | nonce[12] | ciphertext[n] | tag[16]`, máximo 131105 bytes según [security.md](security.md). Cada columna obligatoria se define NOT NULL. Las PK BLOB deben declarar NOT NULL explícito; no confiar en peculiaridades históricas de SQLite.

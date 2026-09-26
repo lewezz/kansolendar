@@ -48,6 +48,21 @@ struct VaultPayloadCodecTests {
         #expect(decoded.recurrence == rule)
     }
 
+    @Test("occurrence cancellation preserves its original instant")
+    func cancellationRoundTrip() throws {
+        let cancellation = EventCancellation(key: EventOccurrenceKey(
+            eventID: eventID,
+            originalStart: .instant(Instant(unixSeconds: -86_400))
+        ))
+
+        let decoded = try VaultPayloadCodec.decodeCancellation(
+            VaultPayloadCodec.encode(cancellation),
+            eventID: eventID
+        )
+
+        #expect(decoded == cancellation)
+    }
+
     @Test("all-day and zoned values preserve their time semantics")
     func nonUTCEventTimesRoundTrip() throws {
         let startDate = try CivilDate(year: 2026, month: 12, day: 31)
