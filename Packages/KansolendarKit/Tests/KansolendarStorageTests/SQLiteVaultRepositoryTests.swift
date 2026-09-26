@@ -67,6 +67,7 @@ struct SQLiteVaultRepositoryTests {
     func recurrenceCancellationsPersist() async throws {
         let database = try SQLiteVaultDatabase(path: ":memory:", keyStore: FixtureVaultKeyStore())
         _ = try await database.createVault()
+        let vault = KansolendarVault(storage: database)
         let calendar = try LocalCalendar(name: "Repeating", defaultTimeZone: TimeZoneID("UTC"))
         try await database.saveCalendar(calendar)
         let start = Instant(unixSeconds: 0)
@@ -91,6 +92,31 @@ struct SQLiteVaultRepositoryTests {
         let occurrences = try RecurrenceEngine().expand(series, in: query)
         #expect(occurrences.count == 4)
         #expect(!occurrences.contains { $0.key.originalStart == .instant(cancelledStart) })
+
+        let matchingRange = EventTimeRange.instant(try InstantRange(
+            start: Instant(unixSeconds: 2 * 86_400),
+            endExclusive: Instant(unixSeconds: 3 * 86_400)
+        ))
+        let matchingQuery = EventSearchQuery(text: "STANDUP", calendarIDs: [calendar.id], timeRange: matchingRange)
+        #expect(try await vault.events(matching: matchingQuery).map(\.event.id) == [event.id])
+        let cancelledRange = EventTimeRange.instant(try InstantRange(
+            start: Instant(unixSeconds: 86_400),
+            endExclusive: Instant(unixSeconds: 2 * 86_400)
+        ))
+        let cancelledQuery = EventSearchQuery(text: "standup", timeRange: cancelledRange)
+        #expect(try await vault.events(matching: cancelledQuery).isEmpty)
+
+        let oversizedRange = EventTimeRange.instant(try InstantRange(
+            start: Instant(unixSeconds: 0),
+            endExclusive: Instant(unixSeconds: 367 * 86_400)
+        ))
+        let oversizedQuery = EventSearchQuery(timeRange: oversizedRange)
+        do {
+            _ = try await vault.events(matching: oversizedQuery)
+            Issue.record("Queries must honor the recurrence expansion budget")
+        } catch let error as VaultError {
+            #expect(error == .queryLimitExceeded)
+        }
 
         let wrongSeriesKey = EventOccurrenceKey(eventID: UUID(), originalStart: .instant(cancelledStart))
         do {

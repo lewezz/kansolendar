@@ -201,6 +201,8 @@ private final class VaultViewModel {
             "Ya hay una solicitud de autenticación en curso."
         case .invalidInput:
             "Los datos de la operación no son válidos. No se ha modificado el calendario."
+        case .queryLimitExceeded:
+            "La búsqueda es demasiado amplia. Acota el intervalo y vuelve a intentarlo."
         case .storageUnavailable:
             "El almacén local no está disponible. No se ha mostrado información parcial."
         }

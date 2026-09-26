@@ -26,6 +26,7 @@ public enum VaultError: Error, Sendable, Equatable {
     case timeZoneRulesChanged
     case unlockInProgress
     case invalidInput
+    case queryLimitExceeded
 }
 
 /// Public app-facing boundary for the local encrypted vault. It exposes domain values
@@ -112,6 +113,15 @@ public actor KansolendarVault {
         }
     }
 
+    /// Searches decrypted titles in the current session and expands recurrence only within Core's bounded query budget.
+    public func events(matching query: EventSearchQuery) async throws -> [VaultEvent] {
+        do {
+            return try await storage.events(matching: query)
+        } catch {
+            throw Self.map(error)
+        }
+    }
+
     public func deleteEvent(id: UUID) async throws {
         do {
             try await storage.removeEvent(id: id)
@@ -183,6 +193,10 @@ public actor KansolendarVault {
             .timeZoneRulesChanged
         case VaultStorageError.unlockInProgress, VaultStorageError.unlockSuperseded:
             .unlockInProgress
+        case DomainValidationError.queryLimitExceeded,
+             DomainValidationError.candidateLimitExceeded,
+             DomainValidationError.occurrenceLimitExceeded:
+            .queryLimitExceeded
         case is DomainValidationError, VaultPayloadCodecError.invalidPayload:
             .invalidInput
         default:

@@ -365,6 +365,33 @@ internal actor SQLiteVaultDatabase {
         }
     }
 
+    func events(matching query: EventSearchQuery) throws -> [VaultEvent] {
+        let candidates = try events().filter { value in
+            if let calendarIDs = query.calendarIDs, !calendarIDs.contains(value.event.calendarID) {
+                return false
+            }
+            let needle = EventSearch.normalized(query.text ?? "")
+            return needle.isEmpty || EventSearch.normalized(value.event.title).contains(needle)
+        }
+        let engine = RecurrenceEngine()
+        var matches: [VaultEvent] = []
+        for value in candidates {
+            if let recurrence = value.recurrence {
+                let series = try RecurringSeries(
+                    event: value.event,
+                    rule: recurrence,
+                    cancellations: value.cancellations
+                )
+                if try !engine.expand(series, in: query.timeRange).isEmpty {
+                    matches.append(value)
+                }
+            } else if !EventSearch.matching([value.event], query: query).isEmpty {
+                matches.append(value)
+            }
+        }
+        return matches.sorted { $0.event.id.uuidString < $1.event.id.uuidString }
+    }
+
     func removeEvent(id: UUID) throws {
         _ = try unlockedGeneration()
         try deleteEvent(id: id)

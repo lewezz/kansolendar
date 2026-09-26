@@ -103,6 +103,8 @@ selección explícita -> snapshot autorizado -> codec -> archivo elegido
                     (plaintext solo en esta salida deliberada)
 ```
 
+La fachada de bóveda actual ofrece consulta local de eventos. Desbloquea y autentica los registros, filtra títulos/calendarios en memoria y expande recurrencias solo dentro del presupuesto de Core. No hay índice de búsqueda en claro en SQLite; el coste inicial es proporcional a los eventos almacenados. Los resultados son series coincidentes, no una lista de ocurrencias para dibujar.
+
 Una escritura solo se confirma a UI tras commit. Si falla, el borrador queda visible en RAM mientras la sesión siga abierta; al bloquear se descarta. Sin autosave en disco ni promesa de recuperar edición no guardada tras cierre o crash. El flujo de importación se conserva únicamente como diseño futuro en [icalendar.md](icalendar.md); no forma parte de los servicios actuales.
 
 ## Sesión, ciclo de vida y estado
