@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-public enum PayloadRecordKind: UInt8, Sendable {
+enum PayloadRecordKind: UInt8, Sendable {
     case control = 0x01
     case calendar = 0x10
     case event = 0x11
@@ -9,14 +9,14 @@ public enum PayloadRecordKind: UInt8, Sendable {
     case eventException = 0x13
 }
 
-public struct PayloadContext: Sendable, Equatable {
-    public let vaultID: UUID
-    public let keyID: UUID
-    public let recordKind: PayloadRecordKind
-    public let recordID: UUID
-    public let parentID: UUID?
+struct PayloadContext: Sendable, Equatable {
+    let vaultID: UUID
+    let keyID: UUID
+    let recordKind: PayloadRecordKind
+    let recordID: UUID
+    let parentID: UUID?
 
-    public init(
+    init(
         vaultID: UUID,
         keyID: UUID,
         recordKind: PayloadRecordKind,
@@ -31,7 +31,7 @@ public struct PayloadContext: Sendable, Equatable {
     }
 }
 
-public enum PayloadEnvelopeError: Error, Equatable {
+enum PayloadEnvelopeError: Error, Equatable {
     case malformed
     case unsupportedVersion(UInt8)
     case payloadTooLarge
@@ -40,9 +40,9 @@ public enum PayloadEnvelopeError: Error, Equatable {
 
 /// Versioned AES-GCM payload format. This authenticates each payload and its row identity;
 /// it does not authenticate the existence or freshness of the database as a whole.
-public enum PayloadEnvelope {
-    public static let version: UInt8 = 1
-    public static let maximumPayloadSize = 131_072
+enum PayloadEnvelope {
+    static let version: UInt8 = 1
+    static let maximumPayloadSize = 131_072
 
     private static let magic = Data([0x4B, 0x4E, 0x53, 0x4C]) // KNSL
     private static let nonceSize = 12
@@ -51,7 +51,7 @@ public enum PayloadEnvelope {
     private static let aadDomain = Data("com.kansolendar.payload".utf8)
 
     /// Layout: magic[4] | version[1] | nonce[12] | ciphertext[n] | tag[16].
-    public static func seal(
+    static func seal(
         _ plaintext: Data,
         using key: SymmetricKey,
         context: PayloadContext
@@ -84,7 +84,7 @@ public enum PayloadEnvelope {
         return envelope
     }
 
-    public static func open(
+    static func open(
         _ envelope: Data,
         using key: SymmetricKey,
         context: PayloadContext

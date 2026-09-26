@@ -41,11 +41,11 @@ Dos módulos Swift dentro de **un paquete local**, más el target de aplicación
 | Application services | Guardar, consultar intervalo, exportar, bloquear, backup/restore | Importador anticipado; servicio vacío por cada operación CRUD |
 | Repository ports | Operaciones de negocio acotadas y resultados, semántica transaccional | SQL o payloads de cifrado expuestos |
 | Storage actor | Conexión SQLite, clave de sesión, serialización/cifrado, repositorios, índice temporal de sesión | UI ni red |
-| Keychain adapter | Crear/leer/borrar secreto con políticas explícitas | Calendarios/eventos, clave cacheada permanentemente |
+| Keychain adapter | Crear/leer/borrar DEK con políticas explícitas y errores tipados | Calendarios/eventos, clave cacheada permanentemente |
 | ICS exporter | Serialización y perfil de salida, valores acotados | Parser de entrada en MVP, apertura de URLs, escritura arbitraria |
 | System adapters | Selección de archivos, señales de suspensión/actividad, logger seguro | Historial persistente de documentos |
 
-Services y Repositories son capas lógicas, no targets adicionales. Security es una carpeta interna de Storage con superficie pequeña. No crear un «CryptoService» disponible a todas las vistas. El proceso completo comparte un espacio de memoria: los módulos son barreras de mantenibilidad, no aislamiento de seguridad.
+Services y Repositories son capas lógicas, no targets adicionales. Security es una carpeta interna de Storage con superficie pequeña. El codec de sobres y `SymmetricKey` son internos al módulo de Storage; solo el actor de almacenamiento debe usar claves. No crear un «CryptoService» disponible a todas las vistas. El proceso completo comparte un espacio de memoria: los módulos son barreras de mantenibilidad, no aislamiento de seguridad.
 
 ## Estructura propuesta, no creada en esta fase
 

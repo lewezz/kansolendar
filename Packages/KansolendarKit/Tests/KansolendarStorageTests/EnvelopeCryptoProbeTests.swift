@@ -1,6 +1,6 @@
 import CryptoKit
 import Foundation
-import KansolendarStorage
+@testable import KansolendarStorage
 import Testing
 
 @Suite("Envelope crypto probe")
