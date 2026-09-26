@@ -1,6 +1,6 @@
 # Persistencia SQLite: diseño inicial
 
-Estado: el esquema v1 tiene DDL y migración inicial ejecutables en `SQLiteVaultDatabase`; CRUD de envelopes, constraints/FK, transacciones de migración y rechazo de versiones futuras tienen tests con datos sintéticos. La app aún no conecta esta base con una bóveda real: faltan composición/repositorios, ruta de producción con permisos restrictivos, Keychain firmado, backup y gates de seguridad. No usar datos reales. SQLite del sistema se enlaza mediante un system-library target local; sin ORM, sin SwiftData, sin dependencia de terceros ni extensión cargable.
+Estado: el esquema v1 y su migración inicial están implementados en `SQLiteVaultDatabase`; el actor conserva conexión, sesión de clave y operaciones de repositorio. `KansolendarVault` ofrece a la app estado y CRUD con errores de dominio saneados. DTOs de dominio se serializan y sellan antes de SQL. Las pruebas usan datos sintéticos y Keychain inyectado: el flujo real de Keychain aún no se ha validado con firma de desarrollo y no se debe guardar información personal hasta cerrar ese gate. Backup/restore y tests UI siguen pendientes. SQLite del sistema se enlaza mediante un system-library target local; sin ORM, sin SwiftData, sin dependencia de terceros ni extensión cargable.
 
 ## Ubicación y exposición
 

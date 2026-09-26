@@ -5,10 +5,10 @@ import Security
 
 /// Owns the Keychain boundary for per-vault encryption keys.
 /// The returned key must stay inside the storage layer and only for an unlocked session.
-internal actor KeychainVaultKeyStore {
+internal actor KeychainVaultKeyStore: VaultKeyStore {
     static let service = "local.kansolendar.vault-key.v1"
 
-    func create(vaultID: UUID, keyID: UUID) throws -> SymmetricKey {
+    func create(vaultID: UUID, keyID: UUID) async throws -> SymmetricKey {
         let key = Self.generateDataEncryptionKey()
         let keyData = key.withUnsafeBytes { Data($0) }
         let accessControl = try Self.makeUserPresenceAccessControl()
@@ -27,7 +27,7 @@ internal actor KeychainVaultKeyStore {
         return key
     }
 
-    func load(vaultID: UUID, keyID: UUID) throws -> SymmetricKey {
+    func load(vaultID: UUID, keyID: UUID) async throws -> SymmetricKey {
         let context = LAContext()
         context.localizedReason = "Unlock your Kansolendar calendar"
         let query = Self.makeReadQuery(vaultID: vaultID, keyID: keyID, context: context)
@@ -44,7 +44,7 @@ internal actor KeychainVaultKeyStore {
         return try Self.makeDataEncryptionKey(from: keyData)
     }
 
-    func delete(vaultID: UUID, keyID: UUID) throws {
+    func delete(vaultID: UUID, keyID: UUID) async throws {
         let status = SecItemDelete(Self.makeDeleteQuery(vaultID: vaultID, keyID: keyID) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw Self.error(for: status)

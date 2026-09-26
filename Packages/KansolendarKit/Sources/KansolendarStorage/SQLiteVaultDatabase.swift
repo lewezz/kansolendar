@@ -1,8 +1,13 @@
 import CSQLite
+import CryptoKit
+import Darwin
 import Foundation
+import KansolendarCore
 
 internal enum SQLiteVaultError: Error, Equatable, Sendable {
     case openFailed(Int32)
+    case filesystemFailure(Int32)
+    case unsafeDatabaseFile
     case databaseFailure(Int32)
     case unsupportedSchemaVersion(Int32)
     case schemaMismatch
@@ -12,6 +17,27 @@ internal enum SQLiteVaultError: Error, Equatable, Sendable {
     case missingRecord
     case integrityFailure
     case foreignKeyFailure
+}
+
+internal enum VaultAccessState: Sendable, Equatable {
+    case notCreated
+    case locked
+    case unlocking(UUID)
+    case unlocked(UUID)
+    case recoveryRequired
+    case corrupt
+}
+
+internal enum VaultStorageError: Error, Equatable, Sendable {
+    case vaultNotCreated
+    case vaultAlreadyCreated
+    case locked
+    case recoveryRequired
+    case corruptVault
+    case unlockSuperseded
+    case timeZoneRulesChanged
+    case duplicateUID
+    case unlockInProgress
 }
 
 internal enum VaultPayloadTable: Sendable {
@@ -34,6 +60,23 @@ internal struct VaultMetadata: Sendable, Equatable {
     let controlEnvelope: Data
 }
 
+private struct VaultControlPayload: Codable, Sendable {
+    let version: Int
+    let vaultID: UUID
+    let keyID: UUID
+}
+
+internal struct VaultCalendarRecord: Sendable, Equatable {
+    let id: UUID
+    let envelope: Data
+}
+
+internal struct VaultEventRecord: Sendable, Equatable {
+    let id: UUID
+    let calendarID: UUID
+    let envelope: Data
+}
+
 /// Serializes access to one SQLite connection. Public-facing storage must pass only
 /// UUID relationships and authenticated envelopes, never plaintext business values.
 internal actor SQLiteVaultDatabase {
@@ -42,10 +85,227 @@ internal actor SQLiteVaultDatabase {
     static let maximumEnvelopeSize = 131_105
 
     private let connection: SQLiteConnection
+    private let keyStore: any VaultKeyStore
+    private var keySession = VaultKeySession()
+    private var accessState: VaultAccessState = .locked
+    private var activeKeyOperation: UUID?
 
-    init(path: String) throws {
+    init(path: String, keyStore: any VaultKeyStore = KeychainVaultKeyStore()) throws {
         connection = try SQLiteConnection(path: path)
+        self.keyStore = keyStore
         try connection.configure()
+    }
+
+    func vaultState() -> VaultAccessState {
+        accessState
+    }
+
+    func createVault() async throws -> UUID {
+        if case .unlocking = accessState { throw VaultStorageError.unlockInProgress }
+        try migrate()
+        guard try metadata() == nil else {
+            accessState = .locked
+            throw VaultStorageError.vaultAlreadyCreated
+        }
+        guard try !hasBusinessRecords() else {
+            accessState = .corrupt
+            throw VaultStorageError.corruptVault
+        }
+
+        let attempt = UUID()
+        activeKeyOperation = attempt
+        accessState = .unlocking(attempt)
+        let vaultID = UUID()
+        let keyID = UUID()
+        do {
+            let key = try await keyStore.create(vaultID: vaultID, keyID: keyID)
+            guard activeKeyOperation == attempt else { throw VaultStorageError.unlockSuperseded }
+
+            let generation = keySession.unlock(with: key)
+            let control = VaultControlPayload(version: 1, vaultID: vaultID, keyID: keyID)
+            let controlBytes = try JSONEncoder().encode(control)
+            let context = PayloadContext(
+                vaultID: vaultID,
+                keyID: keyID,
+                recordKind: .control,
+                recordID: vaultID
+            )
+            let envelope = try keySession.seal(controlBytes, context: context, expectedGeneration: generation)
+            try createVault(vaultID: vaultID, keyID: keyID, controlEnvelope: envelope)
+            activeKeyOperation = nil
+            accessState = .unlocked(generation)
+            return vaultID
+        } catch {
+            _ = keySession.lock()
+            if activeKeyOperation == attempt {
+                activeKeyOperation = nil
+                accessState = .notCreated
+            }
+            throw error
+        }
+    }
+
+    func unlockVault() async throws {
+        if case .unlocked = accessState { return }
+        if case .unlocking = accessState { throw VaultStorageError.unlockInProgress }
+        try migrate()
+        guard let metadata = try metadata() else {
+            if try hasBusinessRecords() {
+                accessState = .corrupt
+                throw VaultStorageError.corruptVault
+            }
+            accessState = .notCreated
+            throw VaultStorageError.vaultNotCreated
+        }
+
+        let attempt = UUID()
+        activeKeyOperation = attempt
+        accessState = .unlocking(attempt)
+        let key: SymmetricKey
+        do {
+            key = try await keyStore.load(vaultID: metadata.vaultID, keyID: metadata.activeKeyID)
+        } catch let error as VaultKeyStoreError {
+            guard activeKeyOperation == attempt else { throw VaultStorageError.unlockSuperseded }
+            activeKeyOperation = nil
+            accessState = error == .missingKey ? .recoveryRequired : .locked
+            if error == .missingKey { throw VaultStorageError.recoveryRequired }
+            throw error
+        } catch {
+            guard activeKeyOperation == attempt else { throw VaultStorageError.unlockSuperseded }
+            activeKeyOperation = nil
+            accessState = .locked
+            throw error
+        }
+        guard activeKeyOperation == attempt else { throw VaultStorageError.unlockSuperseded }
+
+        let generation = keySession.unlock(with: key)
+        do {
+            let context = PayloadContext(
+                vaultID: metadata.vaultID,
+                keyID: metadata.activeKeyID,
+                recordKind: .control,
+                recordID: metadata.vaultID
+            )
+            let bytes = try keySession.open(
+                metadata.controlEnvelope,
+                context: context,
+                expectedGeneration: generation
+            )
+            let control = try JSONDecoder().decode(VaultControlPayload.self, from: bytes)
+            guard control.version == 1,
+                  control.vaultID == metadata.vaultID,
+                  control.keyID == metadata.activeKeyID else {
+                throw VaultStorageError.corruptVault
+            }
+            activeKeyOperation = nil
+            accessState = .unlocked(generation)
+        } catch {
+            _ = keySession.lock()
+            activeKeyOperation = nil
+            accessState = .corrupt
+            throw VaultStorageError.corruptVault
+        }
+    }
+
+    func lockVault() {
+        activeKeyOperation = nil
+        _ = keySession.lock()
+        switch accessState {
+        case .notCreated:
+            break
+        default:
+            accessState = .locked
+        }
+    }
+
+    func saveCalendar(_ calendar: LocalCalendar) throws {
+        let generation = try unlockedGeneration()
+        let context = PayloadContext(
+            vaultID: try currentVaultID(),
+            keyID: try currentKeyID(),
+            recordKind: .calendar,
+            recordID: calendar.id
+        )
+        let envelope = try keySession.seal(
+            VaultPayloadCodec.encode(calendar),
+            context: context,
+            expectedGeneration: generation
+        )
+        try saveCalendar(id: calendar.id, envelope: envelope)
+    }
+
+    func saveEvent(_ event: Event, recurrence: RecurrenceRule? = nil) throws {
+        let generation = try unlockedGeneration()
+        let hasDuplicateUID = try events().contains { existing in
+            existing.event.id != event.id &&
+                existing.event.calendarID == event.calendarID &&
+                existing.event.uid == event.uid
+        }
+        guard !hasDuplicateUID else { throw VaultStorageError.duplicateUID }
+        let context = PayloadContext(
+            vaultID: try currentVaultID(),
+            keyID: try currentKeyID(),
+            recordKind: .event,
+            recordID: event.id,
+            parentID: event.calendarID
+        )
+        let envelope = try keySession.seal(
+            VaultPayloadCodec.encode(event, recurrence: recurrence),
+            context: context,
+            expectedGeneration: generation
+        )
+        try saveEvent(id: event.id, calendarID: event.calendarID, envelope: envelope)
+    }
+
+    func calendars() throws -> [LocalCalendar] {
+        let generation = try unlockedGeneration()
+        let vaultID = try currentVaultID()
+        let keyID = try currentKeyID()
+        do {
+            return try calendarRecords().map { record in
+                let context = PayloadContext(
+                    vaultID: vaultID,
+                    keyID: keyID,
+                    recordKind: .calendar,
+                    recordID: record.id
+                )
+                let payload = try keySession.open(record.envelope, context: context, expectedGeneration: generation)
+                return try VaultPayloadCodec.decodeCalendar(payload, id: record.id)
+            }
+        } catch {
+            return try failClosed(error)
+        }
+    }
+
+    func events() throws -> [VaultEvent] {
+        let generation = try unlockedGeneration()
+        let vaultID = try currentVaultID()
+        let keyID = try currentKeyID()
+        do {
+            return try eventRecords().map { record in
+                let context = PayloadContext(
+                    vaultID: vaultID,
+                    keyID: keyID,
+                    recordKind: .event,
+                    recordID: record.id,
+                    parentID: record.calendarID
+                )
+                let payload = try keySession.open(record.envelope, context: context, expectedGeneration: generation)
+                return try VaultPayloadCodec.decodeEvent(payload, id: record.id, calendarID: record.calendarID)
+            }
+        } catch {
+            return try failClosed(error)
+        }
+    }
+
+    func removeEvent(id: UUID) throws {
+        _ = try unlockedGeneration()
+        try deleteEvent(id: id)
+    }
+
+    func removeCalendar(id: UUID) throws {
+        _ = try unlockedGeneration()
+        try deleteCalendar(id: id)
     }
 
     func migrate() throws {
@@ -55,6 +315,13 @@ internal actor SQLiteVaultDatabase {
         }
         if currentVersion == Self.schemaVersion {
             try validateMetadataSchemaVersion()
+            if case .unlocked = accessState {} else if case .unlocking = accessState {} else {
+                if try metadata() == nil {
+                    accessState = try hasBusinessRecords() ? .corrupt : .notCreated
+                } else {
+                    accessState = .locked
+                }
+            }
             return
         }
 
@@ -63,6 +330,7 @@ internal actor SQLiteVaultDatabase {
             try connection.execute(Self.initialSchema)
             try connection.execute("PRAGMA user_version = 1")
             try connection.execute("COMMIT")
+            accessState = .notCreated
         } catch {
             try? connection.execute("ROLLBACK")
             throw error
@@ -108,6 +376,18 @@ internal actor SQLiteVaultDatabase {
         try insertRecord(sql: "INSERT INTO calendars(id, payload_envelope) VALUES(?1, ?2)", id: id, envelope: envelope)
     }
 
+    func saveCalendar(id: UUID, envelope: Data) throws {
+        try validate(id: id)
+        try validate(envelope: envelope)
+        let statement = try connection.prepare(
+            "INSERT INTO calendars(id, payload_envelope) VALUES(?1, ?2) ON CONFLICT(id) DO UPDATE SET payload_envelope = excluded.payload_envelope"
+        )
+        defer { sqlite3_finalize(statement) }
+        try bind(id, to: statement, at: 1)
+        try bind(envelope, to: statement, at: 2)
+        try stepDone(statement)
+    }
+
     func insertEvent(id: UUID, calendarID: UUID, envelope: Data) throws {
         try validate(id: id)
         try validate(id: calendarID)
@@ -147,6 +427,21 @@ internal actor SQLiteVaultDatabase {
         guard sqlite3_changes(connection.handle) == 1 else { throw SQLiteVaultError.missingRecord }
     }
 
+    func saveEvent(id: UUID, calendarID: UUID, envelope: Data) throws {
+        try validate(id: id)
+        try validate(id: calendarID)
+        try validate(envelope: envelope)
+        let statement = try connection.prepare(
+            "INSERT INTO events(id, calendar_id, payload_envelope) VALUES(?1, ?2, ?3) " +
+                "ON CONFLICT(id) DO UPDATE SET calendar_id = excluded.calendar_id, payload_envelope = excluded.payload_envelope"
+        )
+        defer { sqlite3_finalize(statement) }
+        try bind(id, to: statement, at: 1)
+        try bind(calendarID, to: statement, at: 2)
+        try bind(envelope, to: statement, at: 3)
+        try stepDone(statement)
+    }
+
     func payload(table: VaultPayloadTable, id: UUID) throws -> Data? {
         try validate(id: id)
         let statement = try connection.prepare(table.selectSQL)
@@ -158,12 +453,88 @@ internal actor SQLiteVaultDatabase {
         return try dataColumn(statement, index: 0)
     }
 
+    func calendarRecords() throws -> [VaultCalendarRecord] {
+        let statement = try connection.prepare("SELECT id, payload_envelope FROM calendars ORDER BY id")
+        defer { sqlite3_finalize(statement) }
+        var records: [VaultCalendarRecord] = []
+        while true {
+            let status = sqlite3_step(statement)
+            if status == SQLITE_DONE { return records }
+            guard status == SQLITE_ROW else { throw connection.failure(status) }
+            records.append(VaultCalendarRecord(
+                id: try uuidColumn(statement, index: 0),
+                envelope: try dataColumn(statement, index: 1)
+            ))
+        }
+    }
+
+    func eventRecords() throws -> [VaultEventRecord] {
+        let statement = try connection.prepare("SELECT id, calendar_id, payload_envelope FROM events ORDER BY id")
+        defer { sqlite3_finalize(statement) }
+        var records: [VaultEventRecord] = []
+        while true {
+            let status = sqlite3_step(statement)
+            if status == SQLITE_DONE { return records }
+            guard status == SQLITE_ROW else { throw connection.failure(status) }
+            records.append(VaultEventRecord(
+                id: try uuidColumn(statement, index: 0),
+                calendarID: try uuidColumn(statement, index: 1),
+                envelope: try dataColumn(statement, index: 2)
+            ))
+        }
+    }
+
+    private func hasBusinessRecords() throws -> Bool {
+        for table in ["calendars", "events", "event_exceptions"] {
+            let statement = try connection.prepare("SELECT 1 FROM \(table) LIMIT 1")
+            defer { sqlite3_finalize(statement) }
+            let status = sqlite3_step(statement)
+            if status == SQLITE_ROW { return true }
+            guard status == SQLITE_DONE else { throw connection.failure(status) }
+        }
+        return false
+    }
+
     func deleteEvent(id: UUID) throws {
         try deleteRecord(sql: "DELETE FROM events WHERE id = ?1", id: id)
     }
 
     func deleteCalendar(id: UUID) throws {
         try deleteRecord(sql: "DELETE FROM calendars WHERE id = ?1", id: id)
+    }
+
+    private func unlockedGeneration() throws -> UUID {
+        guard case let .unlocked(generation) = accessState,
+              keySession.isUnlocked,
+              keySession.generation == generation else {
+            throw VaultStorageError.locked
+        }
+        return generation
+    }
+
+    private func currentVaultID() throws -> UUID {
+        guard let metadata = try metadata() else { throw VaultStorageError.corruptVault }
+        return metadata.vaultID
+    }
+
+    private func currentKeyID() throws -> UUID {
+        guard let metadata = try metadata() else { throw VaultStorageError.corruptVault }
+        return metadata.activeKeyID
+    }
+
+    private func failClosed<Value>(_ error: Error) throws -> Value {
+        if let error = error as? SQLiteVaultError {
+            throw error
+        }
+        if let error = error as? VaultKeySessionError, error == .locked || error == .staleGeneration {
+            throw VaultStorageError.locked
+        }
+        if let error = error as? VaultPayloadCodecError, error == .timeZoneRulesChanged {
+            throw VaultStorageError.timeZoneRulesChanged
+        }
+        _ = keySession.lock()
+        accessState = .corrupt
+        throw VaultStorageError.corruptVault
     }
 
     func integrityCheck() throws {
@@ -310,6 +681,9 @@ private final class SQLiteConnection {
     let handle: OpaquePointer
 
     init(path: String) throws {
+        if path != ":memory:" {
+            try Self.preparePrivateDatabaseFile(path: path)
+        }
         var database: OpaquePointer?
         let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_PRIVATECACHE
         let status = sqlite3_open_v2(path, &database, flags, nil)
@@ -318,6 +692,34 @@ private final class SQLiteConnection {
             throw SQLiteVaultError.openFailed(status)
         }
         handle = database
+    }
+
+    private static func preparePrivateDatabaseFile(path: String) throws {
+        let createFlags = O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC
+        let descriptor = path.withCString { open($0, createFlags, mode_t(S_IRUSR | S_IWUSR)) }
+        if descriptor >= 0 {
+            try validateAndCloseFileDescriptor(descriptor)
+            return
+        }
+        guard errno == EEXIST else { throw SQLiteVaultError.filesystemFailure(errno) }
+
+        let existingDescriptor = path.withCString { open($0, O_RDWR | O_NOFOLLOW | O_CLOEXEC) }
+        guard existingDescriptor >= 0 else { throw SQLiteVaultError.filesystemFailure(errno) }
+        try validateAndCloseFileDescriptor(existingDescriptor)
+    }
+
+    private static func validateAndCloseFileDescriptor(_ descriptor: Int32) throws {
+        defer { close(descriptor) }
+        var fileStatus = stat()
+        guard fstat(descriptor, &fileStatus) == 0 else {
+            throw SQLiteVaultError.filesystemFailure(errno)
+        }
+        guard fileStatus.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), fileStatus.st_uid == getuid() else {
+            throw SQLiteVaultError.unsafeDatabaseFile
+        }
+        guard fchmod(descriptor, mode_t(S_IRUSR | S_IWUSR)) == 0 else {
+            throw SQLiteVaultError.filesystemFailure(errno)
+        }
     }
 
     deinit {

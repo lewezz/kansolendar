@@ -47,7 +47,11 @@ Dos módulos Swift dentro de **un paquete local**, más el target de aplicación
 
 Services y Repositories son capas lógicas, no targets adicionales. Security es una carpeta interna de Storage con superficie pequeña. El codec de sobres y `SymmetricKey` son internos al módulo de Storage; solo el actor de almacenamiento debe usar claves. No crear un «CryptoService» disponible a todas las vistas. El proceso completo comparte un espacio de memoria: los módulos son barreras de mantenibilidad, no aislamiento de seguridad.
 
-## Estructura propuesta, no creada en esta fase
+## Estructura actual y evolución prevista
+
+El proyecto Xcode ya existe con un solo target de app (`Kansolendar`) y un paquete local `KansolendarKit` con los módulos `KansolendarCore` y `KansolendarStorage`. Storage mantiene una única conexión SQLite y la sesión de clave dentro de un actor; `KansolendarVault` es la fachada pública hacia la app. La primera pantalla implementa creación, desbloqueo y bloqueo explícitos. Todavía no presenta eventos y la app no carga contenido al abrirse. El botón de creación/desbloqueo sí intenta usar el Keychain real, por lo que su prueba sigue bloqueada hasta validar un build firmado con identidad de desarrollo.
+
+La siguiente estructura describe la evolución de carpetas dentro de esos targets; no implica crear targets o paquetes separados por cada capa:
 
 ```text
 Kansolendar/
