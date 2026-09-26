@@ -1,0 +1,61 @@
+# Local agent workflow state
+.orchestrator/
+
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Dependencies and package-manager caches
+node_modules/
+.pnpm-store/
+.yarn/cache/
+.npm/
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Build, coverage, and framework outputs
+.build/
+DerivedData/
+dist/
+build/
+coverage/
+.next/
+.turbo/
+
+# Xcode user-local state
+xcuserdata/
+*.xcuserstate
+
+# Generated Codex control-plane outputs
+.codex/evals/results/
+
+# codex-workflow generated files
+**/__pycache__/
+.codex/evals/results/*.json
