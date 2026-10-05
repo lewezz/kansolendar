@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 
 /// Mutable session state intended to be held only by the storage actor.
-/// It never returns key material to its caller.
+/// Key material can be reused internally for backups but never crosses the public vault API.
 internal struct VaultKeySession {
     private(set) var generation = UUID()
     private var key: SymmetricKey?
@@ -21,8 +21,13 @@ internal struct VaultKeySession {
 
     mutating func lock() -> UUID {
         key = nil
+        // Replacing the token invalidates any operation that captured the previous session.
         generation = UUID()
         return generation
+    }
+
+    func keyMaterial(expectedGeneration: UUID) throws -> SymmetricKey {
+        try key(for: expectedGeneration)
     }
 
     func seal(

@@ -27,6 +27,7 @@ public enum VaultError: Error, Sendable, Equatable {
     case unlockInProgress
     case invalidInput
     case queryLimitExceeded
+    case restoreRecoveryRequired
 }
 
 /// Public app-facing boundary for the local encrypted vault. It exposes domain values
@@ -37,7 +38,23 @@ public actor KansolendarVault {
     public init() throws {
         do {
             let url = try VaultDatabaseLocation.applicationSupportURL()
-            storage = try SQLiteVaultDatabase(path: url.path)
+            storage = try SQLiteVaultDatabase(path: url.path, keyStore: KeychainVaultKeyStore())
+        } catch {
+            throw Self.map(error)
+        }
+    }
+
+    /// Opens an existing Kansolendar `.kanso` file or reserves a new file when `createNew` is true.
+    public init(portableFileURL url: URL, createNew: Bool = false) throws {
+        guard url.isFileURL, url.pathExtension.lowercased() == "kanso" else {
+            throw VaultError.invalidInput
+        }
+        do {
+            storage = try SQLiteVaultDatabase(
+                path: url.path,
+                usesEmbeddedPasswordWrapper: true,
+                createPortableFile: createNew
+            )
         } catch {
             throw Self.map(error)
         }
@@ -65,12 +82,24 @@ public actor KansolendarVault {
         }
     }
 
+    @discardableResult
+    public func createPasswordVault(password: String) async throws -> UUID {
+        guard VaultPassword.isAcceptable(password) else { throw VaultError.invalidInput }
+        do { return try await storage.createVault(password: password) }
+        catch { throw Self.map(error) }
+    }
+
     public func unlock() async throws {
         do {
             try await storage.unlockVault()
         } catch {
             throw Self.map(error)
         }
+    }
+
+    public func unlock(password: String) async throws {
+        do { try await storage.unlockVault(password: password) }
+        catch { throw Self.map(error) }
     }
 
     public func lock() async {
@@ -170,13 +199,14 @@ public actor KansolendarVault {
         }
     }
 
-    public func restoreBackup(at backupURL: URL, recoveryKitURL: URL) async throws {
+    public func restoreBackup(at backupURL: URL, recoveryKitURL: URL, password: String? = nil) async throws {
+        if let password, !VaultPassword.isAcceptable(password) { throw VaultError.invalidInput }
         do {
             let kitData = try PrivateFileReader.read(
                 recoveryKitURL.path,
                 maximumBytes: RecoveryKit.maximumEncodedSize
             )
-            try await storage.restoreBackup(from: backupURL.path, recoveryKitData: kitData)
+            try await storage.restoreBackup(from: backupURL.path, recoveryKitData: kitData, password: password)
         } catch {
             throw Self.map(error)
         }
@@ -205,6 +235,8 @@ public actor KansolendarVault {
 
     private static func map(_ error: Error) -> VaultError {
         switch error {
+        case SQLiteVaultError.restoreRollbackFailed:
+            .restoreRecoveryRequired
         case VaultStorageError.vaultNotCreated:
             .vaultNotCreated
         case VaultStorageError.vaultAlreadyCreated:
@@ -257,6 +289,10 @@ public actor KansolendarVault {
             .timeZoneRulesChanged
         case VaultStorageError.unlockInProgress, VaultStorageError.unlockSuperseded:
             .unlockInProgress
+        case VaultStorageError.authenticationFailed:
+            .authenticationFailed
+        case VaultStorageError.invalidInput:
+            .invalidInput
         case DomainValidationError.queryLimitExceeded,
              DomainValidationError.candidateLimitExceeded,
              DomainValidationError.occurrenceLimitExceeded:

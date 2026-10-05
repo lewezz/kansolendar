@@ -1,6 +1,5 @@
 import CSQLite
 import CryptoKit
-import Darwin
 import Foundation
 import KansolendarCore
 
@@ -20,6 +19,7 @@ internal enum SQLiteVaultError: Error, Equatable, Sendable {
     case snapshotDestinationExists
     case unsafeSnapshotDestination
     case restoreFailed
+    case restoreRollbackFailed
 }
 
 internal enum VaultAccessState: Sendable, Equatable {
@@ -41,6 +41,8 @@ internal enum VaultStorageError: Error, Equatable, Sendable {
     case timeZoneRulesChanged
     case duplicateUID
     case unlockInProgress
+    case authenticationFailed
+    case invalidInput
 }
 
 internal enum VaultPayloadTable: Sendable {
@@ -89,29 +91,61 @@ internal struct VaultExceptionRecord: Sendable, Equatable {
 /// Serializes access to one SQLite connection. Public-facing storage must pass only
 /// UUID relationships and authenticated envelopes, never plaintext business values.
 internal actor SQLiteVaultDatabase {
+    // MARK: - Schema configuration and session ownership
+
     static let schemaVersion: Int32 = 1
+    private static let portableSchemaVersion: Int32 = 2
+    private static let metadataSchemaVersion: Int64 = 1
+    private static let portableApplicationID: Int32 = 0x4B414E53 // "KANS"
     static let minimumEnvelopeSize = 33
     static let maximumEnvelopeSize = 131_105
 
     private let connection: SQLiteConnection
     private let keyStore: any VaultKeyStore
+    private let usesEmbeddedPasswordWrapper: Bool
     private var keySession = VaultKeySession()
     private var accessState: VaultAccessState = .locked
     private var activeKeyOperation: UUID?
 
-    init(path: String, keyStore: any VaultKeyStore = KeychainVaultKeyStore()) throws {
-        connection = try SQLiteConnection(path: path)
+    init(
+        path: String,
+        keyStore: any VaultKeyStore = KeychainVaultKeyStore(),
+        usesEmbeddedPasswordWrapper: Bool = false,
+        createPortableFile: Bool = false
+    ) throws {
+        self.usesEmbeddedPasswordWrapper = usesEmbeddedPasswordWrapper
+        if usesEmbeddedPasswordWrapper && !createPortableFile {
+            try SQLiteConnection.validatePortableFile(path: path, applicationID: Self.portableApplicationID)
+        }
+        connection = try SQLiteConnection(path: path, requireNewFile: createPortableFile)
         self.keyStore = keyStore
+        if usesEmbeddedPasswordWrapper && !createPortableFile {
+            guard try connection.applicationID() == Self.portableApplicationID else {
+                throw SQLiteVaultError.schemaMismatch
+            }
+        }
         try connection.configure()
+        if usesEmbeddedPasswordWrapper && createPortableFile {
+            try connection.setPortableApplicationID(Self.portableApplicationID)
+        }
     }
+
+    // MARK: - Creation and authentication
 
     func vaultState() -> VaultAccessState {
         accessState
     }
 
     func createVault() async throws -> UUID {
+        try await createVault(password: nil)
+    }
+
+    func createVault(password: String?) async throws -> UUID {
         if case .unlocking = accessState { throw VaultStorageError.unlockInProgress }
         try migrate()
+        if usesEmbeddedPasswordWrapper, password == nil {
+            throw VaultStorageError.invalidInput
+        }
         guard try metadata() == nil else {
             accessState = .locked
             throw VaultStorageError.vaultAlreadyCreated
@@ -127,7 +161,15 @@ internal actor SQLiteVaultDatabase {
         let vaultID = UUID()
         let keyID = UUID()
         do {
-            let key = try await keyStore.create(vaultID: vaultID, keyID: keyID)
+            let key: SymmetricKey
+            let passwordWrapper: PasswordWrappedKeyRecord?
+            if usesEmbeddedPasswordWrapper, let password {
+                key = KeychainVaultKeyStore.generateDataEncryptionKey()
+                passwordWrapper = try PasswordKeyWrapper.wrap(key, password: password, vaultID: vaultID, keyID: keyID)
+            } else {
+                key = try await keyStore.create(vaultID: vaultID, keyID: keyID)
+                passwordWrapper = nil
+            }
             guard activeKeyOperation == attempt else { throw VaultStorageError.unlockSuperseded }
 
             let generation = keySession.unlock(with: key)
@@ -140,7 +182,7 @@ internal actor SQLiteVaultDatabase {
                 recordID: vaultID
             )
             let envelope = try keySession.seal(controlBytes, context: context, expectedGeneration: generation)
-            try createVault(vaultID: vaultID, keyID: keyID, controlEnvelope: envelope)
+            try createVault(vaultID: vaultID, keyID: keyID, controlEnvelope: envelope, passwordWrapper: passwordWrapper)
             activeKeyOperation = nil
             accessState = .unlocked(generation)
             return vaultID
@@ -155,6 +197,10 @@ internal actor SQLiteVaultDatabase {
     }
 
     func unlockVault() async throws {
+        try await unlockVault(password: nil)
+    }
+
+    func unlockVault(password: String?) async throws {
         if case .unlocked = accessState { return }
         if case .unlocking = accessState { throw VaultStorageError.unlockInProgress }
         try migrate()
@@ -172,17 +218,26 @@ internal actor SQLiteVaultDatabase {
         accessState = .unlocking(attempt)
         let key: SymmetricKey
         do {
-            key = try await keyStore.load(vaultID: metadata.vaultID, keyID: metadata.activeKeyID)
+            if usesEmbeddedPasswordWrapper, !(keyStore is FixedVaultKeyStore), let password {
+                guard let record = try passwordWrapper(vaultID: metadata.vaultID, keyID: metadata.activeKeyID) else {
+                    throw VaultKeyStoreError.missingKey
+                }
+                key = try PasswordKeyWrapper.unwrap(record, password: password, vaultID: metadata.vaultID, keyID: metadata.activeKeyID)
+            } else {
+                key = try await keyStore.load(vaultID: metadata.vaultID, keyID: metadata.activeKeyID)
+            }
         } catch let error as VaultKeyStoreError {
             guard activeKeyOperation == attempt else { throw VaultStorageError.unlockSuperseded }
             activeKeyOperation = nil
             accessState = error == .missingKey ? .recoveryRequired : .locked
             if error == .missingKey { throw VaultStorageError.recoveryRequired }
+            if usesEmbeddedPasswordWrapper { throw VaultStorageError.authenticationFailed }
             throw error
         } catch {
             guard activeKeyOperation == attempt else { throw VaultStorageError.unlockSuperseded }
             activeKeyOperation = nil
             accessState = .locked
+            if usesEmbeddedPasswordWrapper { throw VaultStorageError.authenticationFailed }
             throw error
         }
         guard activeKeyOperation == attempt else { throw VaultStorageError.unlockSuperseded }
@@ -216,7 +271,7 @@ internal actor SQLiteVaultDatabase {
         }
     }
 
-    func lockVault() {
+    func lockVault() async {
         activeKeyOperation = nil
         _ = keySession.lock()
         switch accessState {
@@ -227,10 +282,20 @@ internal actor SQLiteVaultDatabase {
         }
     }
 
+    private func activeKey(metadata: VaultMetadata, generation: UUID) async throws -> SymmetricKey {
+        // Recovery validation supplies a fixed key; ordinary portable sessions reuse their unlocked DEK.
+        if usesEmbeddedPasswordWrapper && !(keyStore is FixedVaultKeyStore) {
+            return try keySession.keyMaterial(expectedGeneration: generation)
+        }
+        return try await keyStore.load(vaultID: metadata.vaultID, keyID: metadata.activeKeyID)
+    }
+
+    // MARK: - Backups and recovery
+
     func createSnapshot(at path: String) async throws {
-        _ = try unlockedGeneration()
+        let expectedGeneration = try unlockedGeneration()
         guard let metadata = try metadata() else { throw VaultStorageError.vaultNotCreated }
-        let key = try await keyStore.load(vaultID: metadata.vaultID, keyID: metadata.activeKeyID)
+        let key = try await activeKey(metadata: metadata, generation: expectedGeneration)
         let stagingDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("Kansolendar-Backup-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(
@@ -254,11 +319,17 @@ internal actor SQLiteVaultDatabase {
         }
     }
 
-    func restoreBackup(from sourcePath: String, recoveryKitData: Data) async throws {
+    func restoreBackup(from sourcePath: String, recoveryKitData: Data, password: String? = nil) async throws {
+        try migrate()
         let kit = try RecoveryKit.decode(recoveryKitData)
         let replacementKey = try kit.makeKey()
         let staging = try Self.stageBackup(from: sourcePath)
-        defer { try? FileManager.default.removeItem(at: staging.deletingLastPathComponent()) }
+        var preserveSafetyCopy = false
+        defer {
+            if !preserveSafetyCopy {
+                try? FileManager.default.removeItem(at: staging.deletingLastPathComponent())
+            }
+        }
 
         try await Self.validateBackup(
             at: staging.path,
@@ -272,10 +343,14 @@ internal actor SQLiteVaultDatabase {
         let previousKey: SymmetricKey?
         if let previousMetadata {
             do {
-                previousKey = try await keyStore.load(
-                    vaultID: previousMetadata.vaultID,
-                    keyID: previousMetadata.activeKeyID
-                )
+                if usesEmbeddedPasswordWrapper {
+                    previousKey = try keySession.keyMaterial(expectedGeneration: unlockedGeneration())
+                } else {
+                    previousKey = try await keyStore.load(
+                        vaultID: previousMetadata.vaultID,
+                        keyID: previousMetadata.activeKeyID
+                    )
+                }
             } catch VaultKeyStoreError.missingKey {
                 previousKey = nil
             }
@@ -287,23 +362,61 @@ internal actor SQLiteVaultDatabase {
 
         let hasSameStoredKey = previousMetadata?.vaultID == kit.vaultID &&
             previousMetadata?.activeKeyID == kit.keyID && previousKey != nil
-        var installedReplacement = false
+        let canReplaceEmptyPortableVault: Bool
+        if usesEmbeddedPasswordWrapper, previousMetadata != nil, !hasSameStoredKey {
+            canReplaceEmptyPortableVault = try !hasBusinessRecords()
+        } else {
+            canReplaceEmptyPortableVault = false
+        }
+        if usesEmbeddedPasswordWrapper,
+           previousMetadata != nil,
+           !hasSameStoredKey,
+           !canReplaceEmptyPortableVault {
+            throw VaultStorageError.vaultAlreadyCreated
+        }
+        if hasSameStoredKey, let previousKey {
+            // Equal IDs alone do not prove that the installed key can reopen the backup.
+            try await Self.validateBackup(
+                at: staging.path, key: previousKey,
+                expectedVaultID: kit.vaultID, expectedKeyID: kit.keyID
+            )
+        }
         if !hasSameStoredKey {
-            try await keyStore.install(replacementKey, vaultID: kit.vaultID, keyID: kit.keyID)
-            installedReplacement = true
+            if usesEmbeddedPasswordWrapper {
+                guard password != nil else { throw VaultStorageError.invalidInput }
+            } else {
+                try await keyStore.install(replacementKey, vaultID: kit.vaultID, keyID: kit.keyID)
+            }
         }
 
         do {
             _ = keySession.lock()
             accessState = .locked
             try connection.replaceContents(from: staging.path)
+            if usesEmbeddedPasswordWrapper {
+                try connection.setPortableApplicationID(Self.portableApplicationID)
+            }
+            try migrate()
+            if usesEmbeddedPasswordWrapper, let password {
+                let record = try PasswordKeyWrapper.wrap(replacementKey, password: password, vaultID: kit.vaultID, keyID: kit.keyID)
+                try connection.withImmediateTransaction {
+                    try storePasswordWrapper(record, vaultID: kit.vaultID, keyID: kit.keyID)
+                }
+            }
             let generation = keySession.unlock(with: replacementKey)
             accessState = .unlocked(generation)
             _ = try calendars()
             _ = try events()
         } catch {
-            try? connection.replaceContents(from: safetyURL.path)
             _ = keySession.lock()
+            accessState = .corrupt
+            do {
+                try connection.replaceContents(from: safetyURL.path)
+            } catch {
+                // Keep both encrypted candidates and their keys for manual recovery.
+                preserveSafetyCopy = true
+                throw SQLiteVaultError.restoreRollbackFailed
+            }
             if let previousKey {
                 let generation = keySession.unlock(with: previousKey)
                 accessState = .unlocked(generation)
@@ -315,13 +428,13 @@ internal actor SQLiteVaultDatabase {
                 default: accessState = .locked
                 }
             }
-            if installedReplacement {
-                try? await keyStore.delete(vaultID: kit.vaultID, keyID: kit.keyID)
-            }
+            // install may have reused a previously authorized key. Retain it on
+            // rollback rather than risk deleting a key needed by another backup.
             throw SQLiteVaultError.restoreFailed
         }
 
-        if let previousMetadata,
+        if !usesEmbeddedPasswordWrapper,
+           let previousMetadata,
            previousMetadata.vaultID != kit.vaultID || previousMetadata.activeKeyID != kit.keyID {
             try? await keyStore.delete(vaultID: previousMetadata.vaultID, keyID: previousMetadata.activeKeyID)
         }
@@ -339,7 +452,8 @@ internal actor SQLiteVaultDatabase {
                 vaultID: expectedVaultID,
                 keyID: expectedKeyID,
                 key: key
-            )
+            ),
+            usesEmbeddedPasswordWrapper: try isPortableDatabase(at: path)
         )
         try await validator.unlockVault()
         guard let metadata = try await validator.metadata(),
@@ -352,15 +466,12 @@ internal actor SQLiteVaultDatabase {
         await validator.lockVault()
     }
 
+    private static func isPortableDatabase(at path: String) throws -> Bool {
+        let connection = try SQLiteConnection(path: path)
+        return try connection.applicationID() == portableApplicationID
+    }
+
     private static func stageBackup(from sourcePath: String) throws -> URL {
-        var info = stat()
-        guard lstat(sourcePath, &info) == 0,
-              info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
-              info.st_uid == getuid(),
-              info.st_size > 0,
-              info.st_size <= 1_073_741_824 else {
-            throw SQLiteVaultError.unsafeSnapshotDestination
-        }
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("Kansolendar-Restore-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(
@@ -370,8 +481,7 @@ internal actor SQLiteVaultDatabase {
         )
         let destination = directory.appendingPathComponent("candidate.sqlite")
         do {
-            try FileManager.default.copyItem(atPath: sourcePath, toPath: destination.path)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
+            try PrivateFileCopier.copyNewFile(from: sourcePath, to: destination.path)
             return destination
         } catch {
             try? FileManager.default.removeItem(at: directory)
@@ -382,7 +492,7 @@ internal actor SQLiteVaultDatabase {
     func exportRecoveryKit(to path: String) async throws {
         let expectedGeneration = try unlockedGeneration()
         guard let metadata = try metadata() else { throw VaultStorageError.vaultNotCreated }
-        let key = try await keyStore.load(vaultID: metadata.vaultID, keyID: metadata.activeKeyID)
+        let key = try await activeKey(metadata: metadata, generation: expectedGeneration)
         guard try unlockedGeneration() == expectedGeneration else {
             throw VaultStorageError.unlockSuperseded
         }
@@ -403,6 +513,8 @@ internal actor SQLiteVaultDatabase {
         let kit = try RecoveryKit(vaultID: metadata.vaultID, keyID: metadata.activeKeyID, key: key)
         try RecoveryKitFileWriter.write(try kit.encoded(), to: path)
     }
+
+    // MARK: - Domain values and authenticated payloads
 
     func saveCalendar(_ calendar: LocalCalendar) throws {
         let generation = try unlockedGeneration()
@@ -468,17 +580,13 @@ internal actor SQLiteVaultDatabase {
             ))
         }
 
-        try connection.execute("BEGIN IMMEDIATE")
-        do {
+        // The event and its recurrence exceptions must become visible together.
+        try connection.withImmediateTransaction {
             try saveEvent(id: event.id, calendarID: event.calendarID, envelope: envelope)
             try deleteExceptions(eventID: event.id)
             for (exceptionID, exceptionEnvelope) in encryptedExceptions {
                 try insertException(id: exceptionID, eventID: event.id, envelope: exceptionEnvelope)
             }
-            try connection.execute("COMMIT")
-        } catch {
-            try? connection.execute("ROLLBACK")
-            throw error
         }
     }
 
@@ -514,15 +622,11 @@ internal actor SQLiteVaultDatabase {
                 )
             )
         }
-        try connection.execute("BEGIN IMMEDIATE")
-        do {
+        // Import is all-or-nothing; duplicates were rejected before starting the transaction.
+        try connection.withImmediateTransaction {
             for (id, parentID, envelope) in encrypted {
                 try saveEvent(id: id, calendarID: parentID, envelope: envelope)
             }
-            try connection.execute("COMMIT")
-        } catch {
-            try? connection.execute("ROLLBACK")
-            throw error
         }
     }
 
@@ -590,11 +694,11 @@ internal actor SQLiteVaultDatabase {
     }
 
     func events(matching query: EventSearchQuery) throws -> [VaultEvent] {
+        let needle = EventSearch.normalized(query.text ?? "")
         let candidates = try events().filter { value in
             if let calendarIDs = query.calendarIDs, !calendarIDs.contains(value.event.calendarID) {
                 return false
             }
-            let needle = EventSearch.normalized(query.text ?? "")
             return needle.isEmpty || EventSearch.normalized(value.event.title).contains(needle)
         }
         let engine = RecurrenceEngine()
@@ -623,25 +727,26 @@ internal actor SQLiteVaultDatabase {
 
     func removeCalendar(id: UUID) throws {
         _ = try unlockedGeneration()
-        try connection.execute("BEGIN IMMEDIATE")
-        do {
+        try connection.withImmediateTransaction {
             try deleteEvents(calendarID: id)
             try deleteCalendar(id: id)
-            try connection.execute("COMMIT")
-        } catch {
-            try? connection.execute("ROLLBACK")
-            throw error
         }
     }
 
+    // MARK: - Schema and encrypted record access
+
     func migrate() throws {
         let currentVersion = try connection.userVersion()
-        guard currentVersion <= Self.schemaVersion else {
+        let expectedVersion = usesEmbeddedPasswordWrapper ? Self.portableSchemaVersion : Self.schemaVersion
+        guard currentVersion <= expectedVersion else {
             throw SQLiteVaultError.unsupportedSchemaVersion(currentVersion)
         }
-        if currentVersion == Self.schemaVersion {
+        if currentVersion == expectedVersion {
             try validateMetadataSchemaVersion()
-            if case .unlocked = accessState {} else if case .unlocking = accessState {} else {
+            switch accessState {
+            case .unlocked, .unlocking:
+                break
+            default:
                 if try metadata() == nil {
                     accessState = try hasBusinessRecords() ? .corrupt : .notCreated
                 } else {
@@ -651,31 +756,44 @@ internal actor SQLiteVaultDatabase {
             return
         }
 
-        try connection.execute("BEGIN IMMEDIATE")
-        do {
-            try connection.execute(Self.initialSchema)
-            try connection.execute("PRAGMA user_version = 1")
-            try connection.execute("COMMIT")
-            accessState = .notCreated
-        } catch {
-            try? connection.execute("ROLLBACK")
-            throw error
+        try connection.withImmediateTransaction {
+            if currentVersion == 0 {
+                try connection.execute(Self.initialSchema)
+                if usesEmbeddedPasswordWrapper {
+                    try connection.execute(Self.passwordWrapperSchema)
+                }
+            } else if usesEmbeddedPasswordWrapper {
+                try connection.execute(Self.passwordWrapperSchema)
+            }
+            try connection.execute("PRAGMA user_version = \(expectedVersion)")
         }
+        accessState = .notCreated
     }
 
-    func createVault(vaultID: UUID, keyID: UUID, controlEnvelope: Data) throws {
+    func createVault(
+        vaultID: UUID,
+        keyID: UUID,
+        controlEnvelope: Data,
+        passwordWrapper: PasswordWrappedKeyRecord? = nil
+    ) throws {
         try validate(id: vaultID)
         try validate(id: keyID)
         try validate(envelope: controlEnvelope)
-        let statement = try connection.prepare(
-            "INSERT INTO vault_meta(singleton, vault_id, schema_version, active_key_id, control_envelope) VALUES(1, ?1, ?2, ?3, ?4)"
-        )
-        defer { sqlite3_finalize(statement) }
-        try bind(vaultID, to: statement, at: 1)
-        try bind(Int64(Self.schemaVersion), to: statement, at: 2)
-        try bind(keyID, to: statement, at: 3)
-        try bind(controlEnvelope, to: statement, at: 4)
-        try stepDone(statement)
+        // Metadata and the portable key wrapper form one recoverable vault identity.
+        try connection.withImmediateTransaction {
+            let statement = try connection.prepare(
+                "INSERT INTO vault_meta(singleton, vault_id, schema_version, active_key_id, control_envelope) VALUES(1, ?1, ?2, ?3, ?4)"
+            )
+            defer { sqlite3_finalize(statement) }
+            try bind(vaultID, to: statement, at: 1)
+            try bind(Self.metadataSchemaVersion, to: statement, at: 2)
+            try bind(keyID, to: statement, at: 3)
+            try bind(controlEnvelope, to: statement, at: 4)
+            try stepDone(statement)
+            if let passwordWrapper {
+                try storePasswordWrapper(passwordWrapper, vaultID: vaultID, keyID: keyID)
+            }
+        }
     }
 
     func metadata() throws -> VaultMetadata? {
@@ -688,7 +806,7 @@ internal actor SQLiteVaultDatabase {
         guard status == SQLITE_ROW else { throw connection.failure(status) }
 
         let schemaVersion = sqlite3_column_int64(statement, 3)
-        guard schemaVersion == Int64(Self.schemaVersion) else {
+        guard schemaVersion == Self.metadataSchemaVersion else {
             throw SQLiteVaultError.schemaMismatch
         }
         return VaultMetadata(
@@ -696,6 +814,35 @@ internal actor SQLiteVaultDatabase {
             activeKeyID: try uuidColumn(statement, index: 1),
             controlEnvelope: try dataColumn(statement, index: 2)
         )
+    }
+
+    func passwordWrapper(vaultID: UUID, keyID: UUID) throws -> PasswordWrappedKeyRecord? {
+        let statement = try connection.prepare(
+            "SELECT record FROM vault_key_wrap WHERE singleton = 1 AND vault_id = ?1 AND key_id = ?2"
+        )
+        defer { sqlite3_finalize(statement) }
+        try bind(vaultID, to: statement, at: 1)
+        try bind(keyID, to: statement, at: 2)
+        let status = sqlite3_step(statement)
+        if status == SQLITE_DONE { return nil }
+        guard status == SQLITE_ROW else { throw connection.failure(status) }
+        let data = try dataColumn(statement, index: 0)
+        guard data.count <= 4_096 else { throw SQLiteVaultError.invalidEnvelope }
+        return try JSONDecoder().decode(PasswordWrappedKeyRecord.self, from: data)
+    }
+
+    func storePasswordWrapper(_ record: PasswordWrappedKeyRecord, vaultID: UUID, keyID: UUID) throws {
+        let data = try JSONEncoder().encode(record)
+        guard data.count <= 4_096 else { throw SQLiteVaultError.invalidEnvelope }
+        let statement = try connection.prepare(
+            "INSERT INTO vault_key_wrap(singleton, vault_id, key_id, record) VALUES(1, ?1, ?2, ?3) " +
+                "ON CONFLICT(singleton) DO UPDATE SET vault_id = excluded.vault_id, key_id = excluded.key_id, record = excluded.record"
+        )
+        defer { sqlite3_finalize(statement) }
+        try bind(vaultID, to: statement, at: 1)
+        try bind(keyID, to: statement, at: 2)
+        try bind(data, to: statement, at: 3)
+        try stepDone(statement)
     }
 
     func insertCalendar(id: UUID, envelope: Data) throws {
@@ -865,6 +1012,8 @@ internal actor SQLiteVaultDatabase {
         guard status == SQLITE_DONE else { throw connection.failure(status) }
     }
 
+    // MARK: - Session validation and SQLite bindings
+
     private func unlockedGeneration() throws -> UUID {
         guard case let .unlocked(generation) = accessState,
               keySession.isUnlocked,
@@ -929,7 +1078,7 @@ internal actor SQLiteVaultDatabase {
         let status = sqlite3_step(statement)
         if status == SQLITE_DONE { return }
         guard status == SQLITE_ROW,
-              sqlite3_column_int64(statement, 0) == Int64(Self.schemaVersion)
+              sqlite3_column_int64(statement, 0) == Self.metadataSchemaVersion
         else {
             throw SQLiteVaultError.schemaMismatch
         }
@@ -1037,188 +1186,14 @@ internal actor SQLiteVaultDatabase {
     CREATE INDEX events_calendar_id ON events(calendar_id);
     CREATE INDEX event_exceptions_event_id ON event_exceptions(event_id);
     """
-}
 
-private final class SQLiteConnection {
-    let handle: OpaquePointer
-    private let path: String
-
-    init(path: String, requireNewFile: Bool = false) throws {
-        if path != ":memory:" {
-            try Self.preparePrivateDatabaseFile(path: path, requireNewFile: requireNewFile)
-        }
-        var database: OpaquePointer?
-        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_PRIVATECACHE
-        let status = sqlite3_open_v2(path, &database, flags, nil)
-        guard status == SQLITE_OK, let database else {
-            if let database { sqlite3_close_v2(database) }
-            throw SQLiteVaultError.openFailed(status)
-        }
-        handle = database
-        self.path = path
-    }
-
-    private static func preparePrivateDatabaseFile(path: String, requireNewFile: Bool) throws {
-        let createFlags = O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC
-        let descriptor = path.withCString { open($0, createFlags, mode_t(S_IRUSR | S_IWUSR)) }
-        if descriptor >= 0 {
-            try validateAndCloseFileDescriptor(descriptor)
-            return
-        }
-        if requireNewFile, errno == EEXIST { throw SQLiteVaultError.snapshotDestinationExists }
-        guard errno == EEXIST else { throw SQLiteVaultError.filesystemFailure(errno) }
-
-        let existingDescriptor = path.withCString { open($0, O_RDWR | O_NOFOLLOW | O_CLOEXEC) }
-        guard existingDescriptor >= 0 else { throw SQLiteVaultError.filesystemFailure(errno) }
-        try validateAndCloseFileDescriptor(existingDescriptor)
-    }
-
-    private static func validateAndCloseFileDescriptor(_ descriptor: Int32) throws {
-        defer { close(descriptor) }
-        var fileStatus = stat()
-        guard fstat(descriptor, &fileStatus) == 0 else {
-            throw SQLiteVaultError.filesystemFailure(errno)
-        }
-        guard fileStatus.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), fileStatus.st_uid == getuid() else {
-            throw SQLiteVaultError.unsafeDatabaseFile
-        }
-        guard fchmod(descriptor, mode_t(S_IRUSR | S_IWUSR)) == 0 else {
-            throw SQLiteVaultError.filesystemFailure(errno)
-        }
-    }
-
-    deinit {
-        sqlite3_close_v2(handle)
-    }
-
-    func configure() throws {
-        sqlite3_extended_result_codes(handle, 1)
-        let timeoutStatus = sqlite3_busy_timeout(handle, 1_000)
-        guard timeoutStatus == SQLITE_OK else { throw failure(timeoutStatus) }
-        let defensiveStatus = kansolendar_sqlite_set_db_config(handle, SQLITE_DBCONFIG_DEFENSIVE, 1)
-        guard defensiveStatus == SQLITE_OK else { throw failure(defensiveStatus) }
-        // The system SQLite header marks extension loading as omitted/no-op.
-        try execute("PRAGMA foreign_keys = ON")
-        guard try pragmaInteger("PRAGMA foreign_keys") == 1 else {
-            throw SQLiteVaultError.foreignKeyFailure
-        }
-        try execute("PRAGMA journal_mode = DELETE")
-        try execute("PRAGMA synchronous = FULL")
-        try execute("PRAGMA temp_store = MEMORY")
-        try execute("PRAGMA trusted_schema = OFF")
-    }
-
-    func snapshot(to destinationPath: String) throws {
-        guard destinationPath != ":memory:",
-              URL(fileURLWithPath: destinationPath).standardizedFileURL.path
-                != URL(fileURLWithPath: path).standardizedFileURL.path else {
-            throw SQLiteVaultError.unsafeSnapshotDestination
-        }
-
-        var completed = false
-        defer {
-            if !completed { try? FileManager.default.removeItem(atPath: destinationPath) }
-        }
-        let destination = try SQLiteConnection(path: destinationPath, requireNewFile: true)
-        try destination.configure()
-
-        guard let backup = sqlite3_backup_init(destination.handle, "main", handle, "main") else {
-            throw destination.failure(sqlite3_errcode(destination.handle))
-        }
-        let stepStatus = sqlite3_backup_step(backup, -1)
-        let finishStatus = sqlite3_backup_finish(backup)
-        guard stepStatus == SQLITE_DONE else { throw failure(stepStatus) }
-        guard finishStatus == SQLITE_OK else { throw destination.failure(finishStatus) }
-        guard try destination.pragmaText("PRAGMA integrity_check") == "ok" else {
-            throw SQLiteVaultError.integrityFailure
-        }
-        guard try !destination.hasRows("PRAGMA foreign_key_check") else {
-            throw SQLiteVaultError.foreignKeyFailure
-        }
-        guard fsyncFile(at: destinationPath) else {
-            throw SQLiteVaultError.filesystemFailure(errno)
-        }
-        completed = true
-    }
-
-    func replaceContents(from sourcePath: String) throws {
-        let source = try SQLiteConnection(path: sourcePath)
-        try source.configure()
-        guard try source.pragmaText("PRAGMA integrity_check") == "ok",
-              try !source.hasRows("PRAGMA foreign_key_check") else {
-            throw SQLiteVaultError.integrityFailure
-        }
-        guard let backup = sqlite3_backup_init(handle, "main", source.handle, "main") else {
-            throw failure(sqlite3_errcode(handle))
-        }
-        let stepStatus = sqlite3_backup_step(backup, -1)
-        let finishStatus = sqlite3_backup_finish(backup)
-        guard stepStatus == SQLITE_DONE, finishStatus == SQLITE_OK else {
-            throw SQLiteVaultError.restoreFailed
-        }
-        guard try pragmaText("PRAGMA integrity_check") == "ok",
-              try !hasRows("PRAGMA foreign_key_check") else {
-            throw SQLiteVaultError.integrityFailure
-        }
-    }
-
-    func execute(_ sql: String) throws {
-        let status = sqlite3_exec(handle, sql, nil, nil, nil)
-        guard status == SQLITE_OK else { throw failure(status) }
-    }
-
-    func prepare(_ sql: String) throws -> OpaquePointer {
-        var statement: OpaquePointer?
-        let status = sqlite3_prepare_v2(handle, sql, -1, &statement, nil)
-        guard status == SQLITE_OK, let statement else { throw failure(status) }
-        return statement
-    }
-
-    func userVersion() throws -> Int32 {
-        Int32(try pragmaInteger("PRAGMA user_version"))
-    }
-
-    func pragmaInteger(_ sql: String) throws -> Int64 {
-        let statement = try prepare(sql)
-        defer { sqlite3_finalize(statement) }
-        let status = sqlite3_step(statement)
-        guard status == SQLITE_ROW else { throw failure(status) }
-        return sqlite3_column_int64(statement, 0)
-    }
-
-    func pragmaText(_ sql: String) throws -> String {
-        let statement = try prepare(sql)
-        defer { sqlite3_finalize(statement) }
-        let status = sqlite3_step(statement)
-        guard status == SQLITE_ROW, let value = sqlite3_column_text(statement, 0) else {
-            throw failure(status)
-        }
-        return String(cString: value)
-    }
-
-    func hasRows(_ sql: String) throws -> Bool {
-        let statement = try prepare(sql)
-        defer { sqlite3_finalize(statement) }
-        let status = sqlite3_step(statement)
-        switch status {
-        case SQLITE_ROW: return true
-        case SQLITE_DONE: return false
-        default: throw failure(status)
-        }
-    }
-
-    private func fsyncFile(at path: String) -> Bool {
-        let descriptor = path.withCString { open($0, O_RDONLY | O_NOFOLLOW | O_CLOEXEC) }
-        guard descriptor >= 0 else { return false }
-        defer { close(descriptor) }
-        return fsync(descriptor) == 0
-    }
-
-    func failure(_ status: Int32) -> SQLiteVaultError {
-        let extendedStatus = sqlite3_extended_errcode(handle)
-        if extendedStatus & 0xFF == SQLITE_CONSTRAINT {
-            return .constraintViolation
-        }
-        return .databaseFailure(extendedStatus == SQLITE_OK ? status : extendedStatus)
-    }
+    private static let passwordWrapperSchema = """
+    CREATE TABLE vault_key_wrap (
+        singleton INTEGER PRIMARY KEY NOT NULL CHECK(singleton = 1),
+        vault_id BLOB NOT NULL CHECK(typeof(vault_id) = 'blob' AND length(vault_id) = 16),
+        key_id BLOB NOT NULL CHECK(typeof(key_id) = 'blob' AND length(key_id) = 16),
+        record BLOB NOT NULL CHECK(typeof(record) = 'blob' AND length(record) BETWEEN 1 AND 4096),
+        FOREIGN KEY(vault_id) REFERENCES vault_meta(vault_id) ON DELETE CASCADE
+    );
+    """
 }

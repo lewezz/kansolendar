@@ -2,10 +2,10 @@ import Foundation
 import LocalAuthentication
 import Security
 
-public enum KeychainProbe {
-    public static let service = "local.kansolendar.security-probe"
+enum KeychainProbe {
+    static let service = "local.kansolendar.security-probe"
 
-    public static func makeUserPresenceAccessControl() throws -> SecAccessControl {
+    static func makeUserPresenceAccessControl() throws -> SecAccessControl {
         var error: Unmanaged<CFError>?
         let accessControl = SecAccessControlCreateWithFlags(
             nil,
@@ -21,7 +21,7 @@ public enum KeychainProbe {
         return accessControl
     }
 
-    public static func store(_ secret: Data, account: String) throws {
+    static func store(_ secret: Data, account: String) throws {
         let accessControl = try makeUserPresenceAccessControl()
 
         let query = makeAddQuery(secret: secret, account: account, accessControl: accessControl)
@@ -48,7 +48,7 @@ public enum KeychainProbe {
         ]
     }
 
-    public static func load(account: String) throws -> Data {
+    static func load(account: String) throws -> Data {
         let authenticationContext = LAContext()
         authenticationContext.localizedReason = "Unlock a Kansolendar development key"
         let query: [String: Any] = [
@@ -75,7 +75,7 @@ public enum KeychainProbe {
         return data
     }
 
-    public static func delete(account: String) throws {
+    static func delete(account: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -90,7 +90,7 @@ public enum KeychainProbe {
     }
 }
 
-public enum KeychainProbeError: Error, Equatable {
+enum KeychainProbeError: Error, Equatable {
     public static func == (lhs: KeychainProbeError, rhs: KeychainProbeError) -> Bool {
         switch (lhs, rhs) {
         case let (.status(lhsStatus), .status(rhsStatus)):

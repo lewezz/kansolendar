@@ -1,5 +1,4 @@
 import CryptoKit
-import Darwin
 import Foundation
 
 internal struct RecoveryKit: Equatable, Sendable {
@@ -96,32 +95,20 @@ internal enum RecoveryKitError: Error, Equatable, Sendable {
     case filesystemFailure(Int32)
 }
 
+/// Retains the recovery API's error contract while sharing the private, no-overwrite writer.
 internal enum RecoveryKitFileWriter {
     static func write(_ data: Data, to path: String) throws {
-        let descriptor = path.withCString {
-            open($0, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, mode_t(S_IRUSR | S_IWUSR))
-        }
-        guard descriptor >= 0 else {
-            if errno == EEXIST { throw RecoveryKitError.destinationExists }
-            throw RecoveryKitError.filesystemFailure(errno)
-        }
-
-        var completed = false
-        defer {
-            close(descriptor)
-            if !completed { unlink(path) }
-        }
-        try data.withUnsafeBytes { rawBuffer in
-            guard let baseAddress = rawBuffer.baseAddress else { return }
-            var written = 0
-            while written < rawBuffer.count {
-                let result = Darwin.write(descriptor, baseAddress.advanced(by: written), rawBuffer.count - written)
-                if result < 0, errno == EINTR { continue }
-                guard result > 0 else { throw RecoveryKitError.filesystemFailure(errno) }
-                written += result
+        do {
+            try PrivateFileWriter.write(data, to: path)
+        } catch let error as PrivateFileError {
+            switch error {
+            case .destinationExists:
+                throw RecoveryKitError.destinationExists
+            case let .filesystemFailure(status):
+                throw RecoveryKitError.filesystemFailure(status)
+            case .invalidSource:
+                throw RecoveryKitError.malformed
             }
         }
-        guard fsync(descriptor) == 0 else { throw RecoveryKitError.filesystemFailure(errno) }
-        completed = true
     }
 }

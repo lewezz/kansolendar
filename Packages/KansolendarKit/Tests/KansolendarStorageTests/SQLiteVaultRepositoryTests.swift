@@ -6,6 +6,108 @@ import Testing
 
 @Suite("Encrypted vault repository")
 struct SQLiteVaultRepositoryTests {
+    @Test("public Kanso vault API creates and unlocks a named file")
+    func portableVaultPublicAPI() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Family.kanso")
+        let password = "family calendar private phrase"
+
+        let created = try KansolendarVault(portableFileURL: url, createNew: true)
+        _ = try await created.createPasswordVault(password: password)
+        await created.lock()
+
+        let reopened = try KansolendarVault(portableFileURL: url)
+        #expect(try await reopened.state() == .locked)
+        await #expect(throws: VaultError.authenticationFailed) {
+            try await reopened.unlock(password: "incorrect calendar phrase")
+        }
+        try await reopened.unlock(password: password)
+        #expect(try await reopened.state() == .unlocked)
+        await reopened.lock()
+    }
+
+    @Test("restoring into a new portable file embeds a new password wrapper")
+    func restoreBackupIntoPortableKansoFile() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let targetPassword = "target family secure calendar"
+        let restoredPassword = "restored family vault phrase"
+        let source = try SQLiteVaultDatabase(
+            path: directory.appendingPathComponent("source.sqlite").path,
+            keyStore: FixtureVaultKeyStore()
+        )
+        _ = try await source.createVault()
+        let calendar = try LocalCalendar(name: "Restored family", defaultTimeZone: TimeZoneID("UTC"))
+        try await source.saveCalendar(calendar)
+        let backupURL = directory.appendingPathComponent("family.kansobackup")
+        let kitURL = directory.appendingPathComponent("family.recovery")
+        try await source.createSnapshot(at: backupURL.path)
+        try await source.exportRecoveryKit(to: kitURL.path)
+
+        let targetURL = directory.appendingPathComponent("Family.kanso")
+        let target = try SQLiteVaultDatabase(path: targetURL.path, usesEmbeddedPasswordWrapper: true, createPortableFile: true)
+        _ = try await target.createVault(password: targetPassword)
+        try await target.restoreBackup(
+            from: backupURL.path,
+            recoveryKitData: Data(contentsOf: kitURL),
+            password: restoredPassword
+        )
+        #expect(try await target.calendars() == [calendar])
+        await target.lockVault()
+
+        let reopened = try SQLiteVaultDatabase(path: targetURL.path, usesEmbeddedPasswordWrapper: true)
+        await #expect(throws: VaultStorageError.authenticationFailed) {
+            try await reopened.unlockVault(password: targetPassword)
+        }
+        try await reopened.unlockVault(password: restoredPassword)
+        #expect(try await reopened.calendars() == [calendar])
+        await reopened.lockVault()
+    }
+
+    @Test("portable Kanso files embed their own password wrapper and reopen after copying")
+    func portableKansoFilesAreIndependentAndMovable() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let firstURL = directory.appendingPathComponent("Personal.kanso")
+        let secondURL = directory.appendingPathComponent("Work.kanso")
+        let copiedURL = directory.appendingPathComponent("Moved Personal.kanso")
+        let firstPassword = "indigo harbor orchard morning"
+        let secondPassword = "silver meadow candle window"
+
+        let first = try SQLiteVaultDatabase(path: firstURL.path, usesEmbeddedPasswordWrapper: true, createPortableFile: true)
+        _ = try await first.createVault(password: firstPassword)
+        let calendar = try LocalCalendar(name: "Private", defaultTimeZone: TimeZoneID("UTC"))
+        try await first.saveCalendar(calendar)
+        await first.lockVault()
+
+        let firstMode = try FileManager.default.attributesOfItem(atPath: firstURL.path)[.posixPermissions] as? NSNumber
+        #expect(firstMode?.intValue == 0o600)
+        #expect(try await first.userVersion() == 2)
+        #expect(try Data(contentsOf: firstURL).range(of: Data(firstPassword.utf8)) == nil)
+        let metadata = try #require(await first.metadata())
+        #expect(try await first.passwordWrapper(vaultID: metadata.vaultID, keyID: metadata.activeKeyID) != nil)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["Personal.kanso"])
+
+        let second = try SQLiteVaultDatabase(path: secondURL.path, usesEmbeddedPasswordWrapper: true, createPortableFile: true)
+        _ = try await second.createVault(password: secondPassword)
+        #expect(try await second.calendars().isEmpty)
+        await second.lockVault()
+        await #expect(throws: VaultStorageError.authenticationFailed) {
+            try await second.unlockVault(password: firstPassword)
+        }
+
+        try FileManager.default.copyItem(at: firstURL, to: copiedURL)
+        let moved = try SQLiteVaultDatabase(path: copiedURL.path, usesEmbeddedPasswordWrapper: true)
+        try await moved.unlockVault(password: firstPassword)
+        #expect(try await moved.calendars().map(\.name) == ["Private"])
+        await moved.lockVault()
+    }
+
     @Test("app-facing state migrates storage and reports an empty vault")
     func initialStateIsNotCreated() async throws {
         let storage = try SQLiteVaultDatabase(path: ":memory:", keyStore: FixtureVaultKeyStore())
@@ -354,6 +456,59 @@ struct SQLiteVaultRepositoryTests {
 
         #expect(try await target.calendars() == [restoredCalendar])
         #expect(await target.vaultState().isUnlocked)
+        try await target.restoreBackup(from: backup.path, recoveryKitData: Data(contentsOf: kit))
+        await target.lockVault()
+        try await target.unlockVault()
+        #expect(try await target.calendars() == [restoredCalendar])
+    }
+
+    @Test("restore rejects an installed key with matching IDs but different material")
+    func restoreRejectsMismatchedStoredKey() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let keys = FixtureVaultKeyStore()
+        let database = try SQLiteVaultDatabase(path: root.appendingPathComponent("vault.sqlite").path, keyStore: keys)
+        _ = try await database.createVault()
+        let calendar = try LocalCalendar(name: "Preserved", defaultTimeZone: TimeZoneID("UTC"))
+        try await database.saveCalendar(calendar)
+        let backup = root.appendingPathComponent("backup.kansobackup")
+        let kit = root.appendingPathComponent("recovery.txt")
+        try await database.createSnapshot(at: backup.path)
+        try await database.exportRecoveryKit(to: kit.path)
+        let metadata = try #require(try await database.metadata())
+        try await keys.install(SymmetricKey(size: .bits256), vaultID: metadata.vaultID, keyID: metadata.activeKeyID)
+
+        await #expect(throws: (any Error).self) {
+            try await database.restoreBackup(from: backup.path, recoveryKitData: Data(contentsOf: kit))
+        }
+        #expect(try await database.calendars() == [calendar])
+    }
+
+    @Test("denied key installation preserves the current vault during migration")
+    func deniedMigrationPreservesVault() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try SQLiteVaultDatabase(path: root.appendingPathComponent("source.sqlite").path, keyStore: FixtureVaultKeyStore())
+        _ = try await source.createVault()
+        let backup = root.appendingPathComponent("backup.kansobackup")
+        let kit = root.appendingPathComponent("recovery.txt")
+        try await source.createSnapshot(at: backup.path)
+        try await source.exportRecoveryKit(to: kit.path)
+        let keys = FixtureVaultKeyStore()
+        let target = try SQLiteVaultDatabase(path: root.appendingPathComponent("target.sqlite").path, keyStore: keys)
+        _ = try await target.createVault()
+        let calendar = try LocalCalendar(name: "Keep me", defaultTimeZone: TimeZoneID("UTC"))
+        try await target.saveCalendar(calendar)
+        await keys.setInstallError(.userCancelled)
+        await #expect(throws: VaultKeyStoreError.userCancelled) {
+            try await target.restoreBackup(from: backup.path, recoveryKitData: Data(contentsOf: kit))
+        }
+        #expect(try await target.calendars() == [calendar])
+        await target.lockVault()
+        try await target.unlockVault()
+        #expect(try await target.calendars() == [calendar])
     }
 
     @Test("wrong recovery kit preserves the active vault")
@@ -545,6 +700,7 @@ struct SQLiteVaultRepositoryTests {
 private actor FixtureVaultKeyStore: VaultKeyStore {
     private var keys: [String: Data] = [:]
     private var loadError: VaultKeyStoreError?
+    private var installError: VaultKeyStoreError?
     private var createDelayNanoseconds: UInt64 = 0
 
     func create(vaultID: UUID, keyID: UUID) async throws -> SymmetricKey {
@@ -557,6 +713,7 @@ private actor FixtureVaultKeyStore: VaultKeyStore {
     }
 
     func install(_ key: SymmetricKey, vaultID: UUID, keyID: UUID) async throws {
+        if let installError { throw installError }
         keys[KeychainVaultKeyStore.account(vaultID: vaultID, keyID: keyID)] = key.withUnsafeBytes { Data($0) }
     }
 
@@ -570,6 +727,10 @@ private actor FixtureVaultKeyStore: VaultKeyStore {
 
     func delete(vaultID: UUID, keyID: UUID) async throws {
         keys[KeychainVaultKeyStore.account(vaultID: vaultID, keyID: keyID)] = nil
+    }
+
+    func setInstallError(_ error: VaultKeyStoreError?) {
+        installError = error
     }
 
     func setLoadError(_ error: VaultKeyStoreError?) {
