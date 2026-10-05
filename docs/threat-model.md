@@ -1,50 +1,19 @@
 # Threat model
 
-This model describes implemented defenses and current limitations, not a claim
-that the current working tree is independently audited or release-verified.
+## Protected assets
 
-## Assets and trust boundaries
+Calendar titles, notes, locations, times, IDs, relationships, recurrence and cancellations reside inside authenticated whole-document ciphertext. A random data key is wrapped with the document's own password, independently of the origin Mac. Public filenames/properties and bounded cryptographic parameters remain visible.
 
-Assets include calendar/event details, passwords, random data keys, recovery kits,
-and the integrity/availability of vault files. Boundaries include untrusted file
-input, the sandbox's user-selected file access, local Keychain authentication,
-password wrapping, storage actor isolation, and decrypted presentation state.
+Copied files permit offline guessing. PBKDF2 is platform-provided but not memory-hard; strong unique phrases matter. Password loss is irreversible. Tampering, truncation, parameter substitution and domain inconsistencies are rejected. Valid prior documents can still be replayed: there is no anti-rollback mechanism.
 
-The app process and its modules share memory. The operating system, signed-app
-identity, system crypto/SQLite implementations, and account security are trusted
-by the design. There is no server trust boundary because no backend exists.
+## Persistence and process state
 
-## Threats and current defenses
+Private encrypted staging and coordinated atomic replacement publish complete candidate state after saving. Local writer leases and saved-content hashes protect cooperative edits, not hostile/distributed writers or cloud conflicts. Staging is fsynced and directory metadata is synced when access permits; ordinary process interruption is not proof of abrupt power-loss durability.
 
-| Threat | Implemented defense | Remaining limit |
-| --- | --- | --- |
-| Copy a vault without its key | Authenticated payload encryption and portable password wrapping | Metadata remains visible; passwords can be guessed offline |
-| Swap ciphertext between records/vaults | AAD binds vault/key/kind/record/parent identities | Does not authenticate the whole row set |
-| Corrupt authenticated content | Envelope/domain validation fails closed | Availability can still be destroyed |
-| Delete rows or replay an old valid file | Structural checks and backups help recovery | No authenticated inventory or freshness proof |
-| Read a local Keychain key without presence | Device-local user-presence item and typed access errors | App identity and signed integration must be verified |
-| Malformed `.ics`, kit, or backup | Format limits, descriptor checks, bounded parsing/staging, prevalidation | Runtime/resource behavior still needs targeted checks |
-| Overwrite an existing output | Exclusive file creation; snapshot cleanup installed after reservation | Does not coordinate arbitrary external filesystem mutation |
-| Late UI update after lock/close | Content/session IDs reject obsolete presentation results | Tokens do not cancel storage operations |
-| Compromise unlocked process/account | Sandbox reduces access scope | No defense against privileged memory/screen access |
-| Obtain recovery kit plus data | Explicit kit export and separate storage guidance | Possession of both permits decryption |
+Decrypted memory, visible screens and explicitly copied passwords are outside at-rest protection. Newly chosen passwords start hidden, but hiding them does not remove them from the unlocked process. Lock on close, screen lock, sleep and idle clears references and prevents stale UI publication; Swift does not guarantee physical zeroization.
 
-## Privacy side channels
+## Reduced interfaces and application identity
 
-Document names, file paths selected by the user, SQLite structure and sizes,
-plaintext exports, clipboard copies, and OS-managed file/screen history may expose
-information outside payload encryption. Cloud-backed folders can synchronize
-files through other software. The app does not control the Mac's other processes
-or network services.
+The current format is the only accepted document. No older storage reader, conversion path, external calendar interchange or key-bearing reset capability remains. Removing those paths reduces dependencies and parsers while retaining validation of current files.
 
-## Current review priorities
-
-Validate signed/sandbox file access and local Keychain behavior for the eventual
-artifact, Finder/multi-window isolation, restore/lock interleavings and rollback,
-and calendar-boundary traps. Automatic idle/background/sleep locking and safe
-recurrence editing are not implemented. No independent review or latest-tree
-build/test result is asserted by this documentation.
-
-See [security](security.md), [privacy](privacy.md), [backups](backups.md), and
-[testing](testing.md). Adding network services, wider permissions, or a changed
-key format would require updating these boundaries and product scope.
+No network service, telemetry or synchronization exists. Ad hoc signing lacks Apple-verified publisher identity; trusted download/first-open handling remains important. Current absence of signing expiration is not a future OS compatibility guarantee. See [testing](testing.md) for verification limits.

@@ -1,37 +1,23 @@
-# Application and distribution status
+# Distribution
 
-## Current project
+There is one Kansolendar app target and shared scheme. It targets arm64 and
+macOS 14+, uses manual ad hoc signing (`CODE_SIGN_IDENTITY = -`), no development
+team or temporary provisioning profile, and no paid developer membership.
+Both app configurations use the same product, not an alternate distribution app.
 
-The repository contains one macOS app target and one shared scheme, both named
-`Kansolendar`, plus the local KansolendarKit package. Debug and Release are
-configured for arm64, Swift 6, automatic Apple Development signing, and the
-`local.kansolendar.development` bundle identifier. The deployment target is macOS
-14.0. These are project settings, not evidence of an installable release.
+`bash scripts/build.sh` builds Release and verifies the signature, architecture,
+absence of provisioning profiles/certificate authorities, absence of debug/network/
+Keychain-group entitlements, and the sandbox. It produces
+`.build/Latest/Build/Products/Release/Kansolendar.app`; no installation, launch,
+archive publication or GitHub upload occurs automatically.
 
-The app has no bundled external runtime, remote package dependency, installer,
-background helper, updater, or network entitlement. Its `.kanso` document type is
-registered in [Info.plist](../Kansolendar/Info.plist).
+Ad hoc signatures have no certificate expiration or seven-day development profile.
+This is independent of Gatekeeper acceptance, OS compatibility and future security
+policy. The app is not Developer ID signed or notarized. GitHub is the intended
+download channel; no release was published by this implementation.
 
-## Requested delivery
-
-GitHub is the user's requested distribution channel. Packaging, publishing,
-release signing identity, update delivery, and fresh-Mac launch behavior are not
-established in the current repository. No published-download or permanent-launch
-guarantee is made by these docs. The name Release does not turn the current
-development-signing configuration into a verified distribution artifact.
-
-Earlier architecture notes proposed a different publication process. That
-proposal is historical, not an implemented or approved release pipeline. There
-is no alternate application variant or parallel distribution configuration.
-
-## Outstanding validation
-
-A requested release needs a concrete packaging/identity decision and verification
-of the resulting artifact on a clean supported Mac, including document association,
-sandbox access, local Keychain behavior, and upgrade continuity. Portable vaults
-carry their own wrapped key; the legacy local vault still depends on its app's
-Keychain identity.
-
-No build, signing, packaging, notarization, GitHub upload, or app launch was run
-as part of this documentation revision. Delivery actions require a separate
-explicit request. See [testing](testing.md) and [ADR-0012](adr/0012-distribution.md).
+Installation and per-app first-open instructions are in [README](../README.md).
+Do not disable Gatekeeper globally. Managed machines may prevent exceptions.
+Fresh-Mac quarantined-download launch, Finder association and sandboxed saving
+need integration validation before claiming a distributable release. See
+[testing](testing.md).

@@ -16,7 +16,7 @@ Offline operation was a product requirement, not a future option. Portable user-
 
 ## Consequences
 
-Backups and interchange are explicit file operations. Other software and the operating system can still use networks or synchronize user-selected directories. See [privacy](../privacy.md).
+Users manage their own document copies. Other software and the operating system can still use networks or synchronize user-selected directories. See [privacy](../privacy.md).
 
 ## Status
 

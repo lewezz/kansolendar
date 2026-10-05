@@ -8,7 +8,7 @@ Independent file-based calendars need controlled document access without reading
 
 ## Decision reflected in the current source
 
-Declare the app sandbox, user-selected file read/write access, and the app's Keychain group. Keep network and unrelated system-service entitlements absent.
+Declare the app sandbox, user-selected file read/write access, and app-scoped file bookmarks. Keep network and unrelated system-service entitlements absent.
 
 ## History and superseded assumptions
 

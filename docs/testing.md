@@ -1,50 +1,17 @@
-# Testing and verification status
+# Verification status
 
-## Current evidence
+The current correction slice removes obsolete persistence/interchange suites together with their unsupported implementations. Its retained domain/encryption/persistence tests and app-state/file-selection tests are recorded in the active implementation workspace.
 
-Core and Storage have Swift Testing suites in the local package. Earlier work
-records package runs and signed local-Keychain checks. Those historical results
-are not an attestation for the latest refactored working tree.
+The latest recorded focused run passed 17 storage tests, 27 core tests and nine app-state tests. Coverage includes encryption/tampering/headers, domain validation/recurrence, current-file reopen/writer exclusion/external-change rejection, foreign-format refusal without source changes, independent sessions, queued creation locks, password concealment/reset, extension-based open-panel filtering, lifecycle callbacks and clipboard expiry.
 
-The recent code refactors used source/control-flow inspection, project/plist
-parsing, Xcode source-registration checks, and whitespace checks. This documentation
-revision uses local-link, language, source-reference, and consistency checks only.
-No application build, package test run, or app launch was performed during these
-revision passes, following the user's instruction against additional builds.
+Actual SwiftUI app sources passed a separate full-source typecheck. A temporary test helper rendered the production welcome views in light and dark appearance, the concealed and revealed password view, and the calendar toolbar. Actual native open-panel delegate callbacks enabled `.kanso` and `.KANSO` fixtures and disabled text/ICS fixtures. A synthetic current-format file created before the correction slice reopened without changing its bytes; invalid reauthentication cleared its unlocked session. No new distributable application, installation or release is required for these source checks. The previously compiled app artifact does not contain this correction slice until an app build is explicitly requested.
 
-## Existing package coverage
+Injected lifecycle events do not prove real OS notification delivery; delegate filter checks do not prove all desktop panel interactions. The native panel screenshot cannot capture its remote content; selection evidence comes from its actual delegate callbacks. These checks do not claim manual clicks on every control, full keyboard interaction, or a second-Mac installation. A separate supported Mac and quarantined-download/update behavior are not established by local tests.
 
-| Area | Suites and cases present in source |
-| --- | --- |
-| Domain | Date/range validation, event/calendar limits, recurrence, search, month grids |
-| Interchange | Supported `.ics` round trips, unsupported input, size bounds |
-| Cryptography | Envelope authentication/context, payload codecs, password wrapping, session generation |
-| Key custody | Keychain query/access-control shape and typed errors |
-| Persistence | Schema, encrypted CRUD, UID collisions, recurrence cancellations, corruption |
-| Files and recovery | Permissions, snapshots, matching/mismatched kits, restoration, refused overwrites |
-| Portable documents | Separate keys/passwords, copy/move reopen, wrong passwords, portable restore |
+## Commands
 
-Tests use synthetic values and isolated storage/key-store fixtures. Their presence
-is not a claim that every OS integration or recent regression has been tested.
-No app UI-test or signed integration-test target is currently declared in the
-Xcode project.
+```sh
+bash scripts/test.sh
+```
 
-## Verification still needed
-
-When requested, compile the current app and run the relevant package suites.
-The package command is `swift test --package-path Packages/KansolendarKit` using
-the selected Xcode toolchain; this command is documented, not executed here.
-
-Then verify create/open/wrong-password/lock/reopen, Finder file routing, multiple
-documents, close during authentication/loading/restore, security-scoped access,
-local Keychain behavior, recovery into a new empty document, rollback preservation,
-and refusal to overwrite an existing destination. Use disposable vaults rather
-than an existing personal store.
-
-Calendar boundaries, non-Gregorian system calendars, DST editor behavior,
-recurrence editing, and resource use also need focused coverage. Packaging and
-fresh-Mac launch checks belong to the concrete distribution artifact, not merely
-a source project or development launch.
-
-See [open work](open-questions.md), [distribution](distribution.md), and
-[code structure](code-structure.md).
+The root package compiles actual app-state and file-panel sources as a library test harness. Use synthetic data only. Future requested artifacts use the existing single-app build script; do not install or publish implicitly.

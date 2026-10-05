@@ -1,48 +1,11 @@
-# Portable `.kanso` vaults
+# Calendar vault files
 
-A `.kanso` file is Kansolendar's own SQLite-based calendar vault. It is not a
-KeePass/KDBX file and has no KeePass interoperability.
+The welcome screen offers Create Vault and Open Vault. Choose a name/location for a new `.kanso`, then set and confirm its password. Independently created files have independent contents, keys and sessions. Each may contain multiple calendars. Creating refuses an existing destination.
 
-## Create and open
+Open selects files by their `.kanso` extension, including uppercase extensions, rather than requiring registered Finder metadata. Storage then validates the actual current encrypted container; renaming an arbitrary file does not make it a vault. Obsolete or foreign formats are rejected without modification. There is no legacy converter or external calendar interchange.
 
-1. Choose **Create Vault File…** on the vault gate or **Vault → Create New Vault File…**.
-2. Choose the file name and directory in the save panel. Existing files are refused.
-3. In the new document window, enter and confirm a password of at least 15 characters.
-4. Create calendars and events inside that vault.
+Passwords are concealed initially in both entry fields and the post-creation sheet. You may reveal or copy the chosen password, open Apple Passwords manually, or continue. Forgotten passwords cannot be reset.
 
-Use **Open Vault File…** to select an existing document and enter its password.
-The project declares the `.kanso` Finder association and routes files into
-separate windows. Actual Finder and multi-window behavior on the latest app
-build still needs verification.
+Copy or move a closed file yourself. A copy retains its original contents, identity and password. The app does not synchronize or merge copies; user-selected cloud folders are the user's responsibility. Writer locks are local and content digests reject external modifications before saving, without providing cross-Mac locking or rollback detection.
 
-The app offers to copy a new password and open Apple Passwords. Add the password
-there yourself. Retrieve it there with Touch ID or your Mac password, then paste
-it into Kansolendar. There is no passkey or automatic Passwords credential save.
-Clipboard contents are not automatically cleared.
-
-## What the file contains
-
-Every independently created vault has its own random 256-bit data key, salt,
-identifiers, and password wrapper. Calendar/event details are encrypted. SQLite
-headers, schema, identifiers, relationships, counts, and sizes remain visible.
-The name displayed by the app comes from the file name, not a separately stored
-vault-title field.
-
-The exported type is `local.kansolendar.vault`, with extension `.kanso` and MIME
-type `application/vnd.kansolendar.vault`. Only the `.kanso` type is registered as
-an app document; `.ics` import uses a file panel.
-
-## Portability and coexistence
-
-Lock and close a document before copying, moving, or renaming it. Copies retain
-its identity, password wrapper, and contents; copying a file does not generate a
-new independent vault identity. Avoid concurrent editing of the same file or its
-copies when expecting a single authoritative history.
-
-Each document has a separate app-level unlock session. The local Application
-Support vault is a separate store; creating a portable file does not migrate or
-delete it. Moving a document to another Mac does not depend on the original
-Mac's Keychain, but compatible app installation still needs separate validation.
-
-See [key management](key-management.md), [backups](backups.md), and
-[security](security.md) for recovery and protection limits.
+Recent-file history is opt-in and initially disabled; disabling it clears history. Files lock on close, Mac lock/sleep and inactivity, defaulting to five minutes with 1, 2, 3, 4, 5, 10, 15 and 30 choices. Application switching alone does not lock. See [privacy](privacy.md), [security](security.md), and [testing](testing.md).

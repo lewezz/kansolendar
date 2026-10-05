@@ -17,7 +17,7 @@ supplied separately during decoding.
 | TimeZoneID | Validated system-recognized time-zone identifier |
 | CivilDateRange / InstantRange | Half-open ranges with exclusive ends |
 
-The UID is data, not a path or the SQLite primary key. Storage enforces UID
+The UID is data, not a path or a persistence primary key. Storage enforces UID
 uniqueness within a calendar. Event.update increments revision, but storage does
 not compare revisions to implement optimistic concurrency.
 

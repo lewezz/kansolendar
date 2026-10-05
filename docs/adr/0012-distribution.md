@@ -8,7 +8,7 @@ The deliverable should be one conventional macOS app that users can obtain throu
 
 ## Decision reflected in the current source
 
-Maintain the sole Kansolendar target/scheme and arm64/macOS 14 configuration. Establish concrete packaging and release identity separately; the current project uses Apple Development signing and a development bundle identifier.
+Maintain the sole Kansolendar target/scheme and arm64/macOS 14 configuration. Establish concrete packaging and release identity separately; the previous project configuration used Apple Development signing and a development bundle identifier.
 
 ## History and superseded assumptions
 
@@ -21,3 +21,9 @@ A development build or the name Release is not a verified distribution artifact.
 ## Status
 
 App configuration implemented; delivery decision and artifact verification pending. Current verification limits are tracked in [testing](../testing.md).
+
+## Current implementation update
+
+The password-only whole-document format and ad hoc signing supersede the relevant
+legacy assumptions above. See [ADR-0014](0014-whole-document-vaults.md),
+[current persistence](../database.md), and [distribution](../distribution.md).

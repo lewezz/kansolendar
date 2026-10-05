@@ -10,9 +10,7 @@ compilation or runtime tests. See [verification status](testing.md).
 | --- | --- |
 | Product overview and current scope | [Overview](executive-summary.md), [feature scope](mvp.md) |
 | Create, open, name, and move vaults | [Portable `.kanso` vaults](kanso-vault-files.md) |
-| Passwords, Apple Passwords, and the local Keychain vault | [Key management](key-management.md) |
-| Encrypted backups and recovery | [Backups](backups.md) |
-| Supported calendar interchange | [iCalendar](icalendar.md) |
+| Passwords and optional Apple Passwords saving | [Key management](key-management.md) |
 | Data exposure and permissions | [Security](security.md), [privacy](privacy.md) |
 | App target and distribution status | [Distribution](distribution.md) |
 
@@ -23,7 +21,7 @@ compilation or runtime tests. See [verification status](testing.md).
 | Source ownership and extension points | [Code structure](code-structure.md) |
 | Module dependencies and lifecycle | [Architecture](architecture.md) |
 | Calendar, event, and time semantics | [Domain model](data-model.md) |
-| Schemas, encrypted records, and transactions | [Database](database.md) |
+| Encrypted format and persistence | [Database](database.md) |
 | Threat boundaries and known limitations | [Threat model](threat-model.md) |
 | Error presentation and diagnostics | [Errors and logging](logging.md) |
 | Existing tests and pending verification | [Testing](testing.md) |
@@ -32,5 +30,4 @@ compilation or runtime tests. See [verification status](testing.md).
 
 The [root README](../README.md) introduces the app. The maintained
 [product specification](../kansolendar.md) defines scope. ADRs record history;
-current guides and source explain today's behavior. They no longer assume a
-future project, a single fixed vault, or export-only iCalendar support.
+current guides and source explain today's behavior. See ADR-0015 for the current single-format scope.

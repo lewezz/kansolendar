@@ -1,83 +1,39 @@
-# SQLite persistence and file format
+# Persistence formats
 
-Kansolendar uses system SQLite through CSQLite. Business details are encrypted
-before binding into SQL; this is payload encryption, not full-file encryption.
-The storage actor owns one SQLiteConnection and its key session.
+## Current `.kanso` container
 
-## Locations and versions
+The current encrypted document framing is:
 
-The local store resolves Application Support through FileManager and uses
-`Kansolendar/vault.sqlite` under that root. The actual root depends on the app's
-sandbox identity; code does not hardcode a user's home directory. Its directory
-is restricted to 0700 and database files to 0600.
+```text
+KANSO\0\x03\0 magic[8] | header_length_be[4] | header_json | GCM_nonce[12] | ciphertext | tag[16]
+```
 
-Portable documents use a user-selected `.kanso` path. Their header application ID
-is `0x4B414E53` (KANS). Files are checked for regular-file type and current-user
-ownership; new documents refuse an existing destination.
+The bounded public header contains random cryptographic context IDs and the
+password-wrapped data key (version, KDF iterations, salt, sealed key). It contains
+no calendar IDs, relationships, names or inventory. The exact magic, length and
+serialized header are authenticated as GCM associated data.
 
-| Version field | Current value |
-| --- | --- |
-| PRAGMA user_version, local schema | 1 |
-| PRAGMA user_version, portable schema | 2 |
-| vault_meta.schema_version | 1 in both modes |
-| Payload codec and envelope version | 1 |
-| Password-wrapper format version | 1 |
+The encrypted document codec version 1 stores its document ID, calendars and
+events, with IDs, parent relationships and recurrence cancellations. Existing
+validated payload codecs enforce domain values after decryption. Duplicate IDs,
+orphaned events, per-calendar duplicate UIDs and invalid cancellations are refused.
 
-These version numbers serve different contracts. A newer schema is rejected;
-opening a portable document does not automatically convert the local vault.
+Limits: 64 MiB encoded plaintext; at most 1,000 calendars and 100,000 events;
+header at most 4,096 bytes. File framing bounds are checked before decryption,
+and fixed KDF parameters prevent untrusted files requesting arbitrary work.
 
-## Tables
+## Persistence ownership
 
-| Table | Visible fields | Encrypted or wrapped field |
-| --- | --- | --- |
-| vault_meta | singleton, vault_id, schema_version, active_key_id | control_envelope |
-| calendars | id | payload_envelope |
-| events | id, calendar_id | payload_envelope |
-| event_exceptions | id, event_id | payload_envelope |
-| vault_key_wrap, portable only | singleton, vault_id, key_id | record containing salt/KDF metadata and wrapped key |
+One storage actor owns one decrypted document and key session. Mutation prepares
+a candidate, validates and encrypts it, stages encrypted bytes with owner-only
+permissions, then replaces the file atomically under NSFileCoordinator. Candidate
+state publishes only after save succeeds. Failures that might leave ambiguous
+persistence lock storage instead of presenting a stale editable document.
 
-UUIDs are 16-byte BLOBs. Type/length checks are explicit SQL constraints; the
-current schema is not declared STRICT. Events reference calendars with DELETE
-RESTRICT, and exceptions reference events with DELETE CASCADE. Parent lookup
-indexes exist on events.calendar_id and event_exceptions.event_id.
-
-Calendar payloads contain name, color, sort order, and default zone. Event payloads
-contain UID, title, notes, location, time, revision, and optional recurrence.
-Exception payloads encode occurrence cancellations. There is no plaintext title,
-date, UID, search index, or materialized occurrence table.
-
-The control payload authenticates version, vault ID, and key ID. It is not an
-authenticated inventory of all rows. The portable wrapper record is bounded to
-4,096 bytes and belongs to the vault metadata through a foreign key.
-
-## Transactions and connections
-
-Connection setup enables foreign keys, defensive mode, a 1,000 ms busy timeout,
-DELETE journaling, FULL synchronization, memory temporary storage, and disabled
-trusted schema. There is no downloaded SQLite implementation, ORM, FTS index, or
-custom page-encryption codec.
-
-withImmediateTransaction centralizes synchronous non-nested write transactions.
-It is used for schema setup, metadata/wrapper creation, event/cancellation changes,
-imports, and calendar deletion. In-memory success state follows commit. The
-connection's actor owner serializes calls; no await occurs inside a transaction.
-
-Search decrypts records and filters in memory. No incremental RAM index or
-optimistic revision-compare write protocol is currently implemented.
-
-## File integrity and recovery
-
-Payload envelopes range from 33 to 131,105 bytes and authenticate row identities.
-SQLite integrity/foreign-key checks and payload validation are used during backup
-validation. They do not prove that rows were not removed or that a database is the
-newest copy. DELETE journals may exist while a transaction is active; move/copy a
-vault only after locking and closing it.
-
-Backups use SQLite's backup API plus private staging and validation. Restore
-retains a safety snapshot and attempts rollback. See [backups](backups.md).
-No general schema-migration backup framework, downgrade conversion, secure-delete
-guarantee, or live multi-process coordination is implemented.
-
-Source: [storage actor](../Packages/KansolendarKit/Sources/KansolendarStorage/SQLiteVaultDatabase.swift),
-[connection](../Packages/KansolendarKit/Sources/KansolendarStorage/SQLiteConnection.swift),
-and [location resolver](../Packages/KansolendarKit/Sources/KansolendarStorage/VaultDatabaseLocation.swift).
+A stable per-path lock lives in Application Support inside the app container;
+its hash-based marker has no plaintext path or key. It survives inode replacement
+and excludes cooperative local editors. A saved-content digest refuses external
+changes. It is not cross-machine coordination or an authenticated freshness log.
+Foundation's replacement directory avoids assuming permission to arbitrary sibling
+files. Parent metadata is fsynced when accessible; sandboxed save behavior needs
+real file-panel verification.
