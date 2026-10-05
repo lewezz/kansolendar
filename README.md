@@ -1,6 +1,6 @@
 <p align="center"><img src="kansolendar-logo.png" alt="Kansolendar logo" width="180"></p>
 
-# Kansolendar
+# Kansolendar - Nobody needs to know your plans
 
 A private, offline calendar for Apple Silicon Macs running macOS 14 or later.
 No accounts, servers, app-managed synchronization, analytics, or telemetry.
