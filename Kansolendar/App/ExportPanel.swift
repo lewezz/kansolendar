@@ -3,6 +3,35 @@ import UniformTypeIdentifiers
 
 @MainActor
 enum ExportPanel {
+    static let kansoType = UTType(exportedAs: "local.kansolendar.vault", conformingTo: .database)
+
+    static func chooseKansoDestination() -> URL? {
+        guard let selected = chooseDestination(
+            title: "Create Calendar Vault",
+            message: "Choose a name and location for this independent, password-protected vault file.",
+            name: "Kansolendar.kanso",
+            type: kansoType
+        ) else { return nil }
+        let url = selected.pathExtension.lowercased() == "kanso" ? selected : selected.appendingPathExtension("kanso")
+        guard !FileManager.default.fileExists(atPath: url.path) else {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "A file already exists at that location."
+            alert.informativeText = "Choose a different name. Kansolendar will never overwrite an existing vault file."
+            alert.runModal()
+            return nil
+        }
+        return url
+    }
+
+    static func chooseKansoToOpen() -> URL? {
+        chooseSource(
+            title: "Open Calendar Vault",
+            message: "Choose a Kansolendar .kanso file. Each file has its own password.",
+            types: [kansoType]
+        )
+    }
+
     static func chooseBackupDestination() -> URL? {
         chooseDestination(
             title: "Save Encrypted Backup",

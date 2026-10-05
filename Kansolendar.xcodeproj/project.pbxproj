@@ -16,6 +16,11 @@
 		0D0000000000000000000107 /* MonthCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0000000000000000000207 /* MonthCalendarView.swift */; };
 		0D0000000000000000000108 /* CalendarScaleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0000000000000000000208 /* CalendarScaleViews.swift */; };
 		0D0000000000000000000109 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0D0000000000000000000209 /* Assets.xcassets */; };
+		0D000000000000000000010A /* VaultViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D000000000000000000020A /* VaultViewModel.swift */; };
+		0D000000000000000000010B /* CalendarEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D000000000000000000020B /* CalendarEditors.swift */; };
+		0D000000000000000000010C /* EventDateAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D000000000000000000020C /* EventDateAdapter.swift */; };
+		0D000000000000000000010D /* VaultError+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D000000000000000000020D /* VaultError+Presentation.swift */; };
+		0D000000000000000000010E /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D000000000000000000020E /* AppTheme.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +33,11 @@
 		0D0000000000000000000207 /* MonthCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthCalendarView.swift; sourceTree = "<group>"; };
 		0D0000000000000000000208 /* CalendarScaleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarScaleViews.swift; sourceTree = "<group>"; };
 		0D0000000000000000000209 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		0D000000000000000000020A /* VaultViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultViewModel.swift; sourceTree = "<group>"; };
+		0D000000000000000000020B /* CalendarEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarEditors.swift; sourceTree = "<group>"; };
+		0D000000000000000000020C /* EventDateAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDateAdapter.swift; sourceTree = "<group>"; };
+		0D000000000000000000020D /* VaultError+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VaultError+Presentation.swift"; sourceTree = "<group>"; };
+		0D000000000000000000020E /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +81,11 @@
 				0D0000000000000000000207 /* MonthCalendarView.swift */,
 				0D0000000000000000000208 /* CalendarScaleViews.swift */,
 				0D0000000000000000000202 /* RootView.swift */,
+				0D000000000000000000020A /* VaultViewModel.swift */,
+				0D000000000000000000020B /* CalendarEditors.swift */,
+				0D000000000000000000020C /* EventDateAdapter.swift */,
+				0D000000000000000000020D /* VaultError+Presentation.swift */,
+				0D000000000000000000020E /* AppTheme.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -173,6 +188,11 @@
 				0D0000000000000000000108 /* CalendarScaleViews.swift in Sources */,
 				0D0000000000000000000101 /* KansolendarApp.swift in Sources */,
 				0D0000000000000000000102 /* RootView.swift in Sources */,
+				0D000000000000000000010A /* VaultViewModel.swift in Sources */,
+				0D000000000000000000010B /* CalendarEditors.swift in Sources */,
+				0D000000000000000000010C /* EventDateAdapter.swift in Sources */,
+				0D000000000000000000010D /* VaultError+Presentation.swift in Sources */,
+				0D000000000000000000010E /* AppTheme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -309,6 +329,7 @@
 				DEVELOPMENT_TEAM = 6WXG2F9KW5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Kansolendar;
+				INFOPLIST_FILE = Kansolendar/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -337,6 +358,7 @@
 				DEVELOPMENT_TEAM = 6WXG2F9KW5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Kansolendar;
+				INFOPLIST_FILE = Kansolendar/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
