@@ -1,20 +1,26 @@
-# Architecture Decision Records
+# Architecture decision records
 
-Fecha inicial: 2026-09-25. Los ADRs son registros de decisión y no código. **Fijado por requisitos** se refiere a instrucciones del propietario. **Propuesto** necesita revisión; incluso un ADR con tecnología fijada puede contener detalles propuestos.
+The records below retain original product decisions and identify later changes.
+Their source-status descriptions are not a fresh compile, test, independent-review,
+or release attestation. Current behavior is summarized by the [documentation index](../README.md).
 
-| ADR | Asunto | Estado |
-|---|---|---|
-| [0001](0001-swiftui.md) | SwiftUI nativo | Stack fijado; organización propuesta |
-| [0002](0002-sqlite.md) | SQLite frente a SwiftData/ORM | Stack fijado; esquema propuesto |
-| [0003](0003-local-only.md) | Offline-only, sin backend ni red | Fijado por requisitos |
-| [0004](0004-encryption.md) | Cifrado de payloads | Alcance aceptado 2026-09-25; detalle técnico y riesgos restantes pendientes |
-| [0005](0005-keychain.md) | Custodia y recuperación de claves | Autenticación macOS y recuperación separada aceptadas 2026-09-25; validación técnica pendiente |
-| [0006](0006-mvvm.md) | MVVM, dominio y repositorios | Patrón fijado; módulos propuestos |
-| [0007](0007-concurrency.md) | Swift Concurrency y sesión | Tecnología fijada; aislamiento propuesto |
-| [0008](0008-no-sync.md) | Ausencia de sincronización | Fijado por requisitos |
-| [0009](0009-no-analytics.md) | Ausencia de analytics/telemetría | Fijado por requisitos |
-| [0010](0010-icalendar.md) | Exportación .ics; importación futura | Importación aplazada por el propietario 2026-09-25; exportación propuesta |
-| [0011](0011-minimal-permissions.md) | Sandbox y permisos mínimos | Propuesto |
-| [0012](0012-distribution.md) | .app y distribución directa | .app fijada; Apple silicon exclusivo decidido 2026-09-25; canal/OS pendientes |
+| Record | Topic | Current scope |
+| --- | --- | --- |
+| [ADR-0001](0001-swiftui.md) | Native SwiftUI application | Implemented in source. |
+| [ADR-0002](0002-sqlite.md) | System SQLite with encrypted payloads | Implemented in source. |
+| [ADR-0003](0003-local-only.md) | Local operation without a backend | Implemented product boundary. |
+| [ADR-0004](0004-encryption.md) | Authenticated payload encryption | Implemented in source; original metadata-exposure decision retained. |
+| [ADR-0005](0005-keychain.md) | Local Keychain custody and separate recovery | Implemented for the local store; portable mode recorded separately. |
+| [ADR-0006](0006-mvvm.md) | Focused presentation, domain, and storage boundaries | Implemented in source and refined by the maintainability pass. |
+| [ADR-0007](0007-concurrency.md) | Actor ownership and session generations | Implemented mechanisms; lifecycle integration still pending verification. |
+| [ADR-0008](0008-no-sync.md) | No application-managed synchronization | Implemented product boundary. |
+| [ADR-0009](0009-no-analytics.md) | No telemetry or remote diagnostics | Implemented product boundary. |
+| [ADR-0010](0010-icalendar.md) | Limited iCalendar import and export | Limited import/export implemented in source. |
+| [ADR-0011](0011-minimal-permissions.md) | Sandbox and selected-file access | Implemented declarations; signed integration pending verification. |
+| [ADR-0012](0012-distribution.md) | Single macOS app and pending GitHub delivery | App configuration implemented; delivery decision and artifact verification pending. |
+| [ADR-0013](0013-portable-vaults.md) | Independent password-protected calendar documents | Implemented in source; current app/runtime verification pending. |
 
-Formato: Context, Decision, Alternatives, Consequences, Status. Al revisar, añadir fecha/decisor y sustituir «Propuesto» solo con aceptación real. Una decisión reemplazada conserva el ADR y enlaza al nuevo; no reescribir historia para fingir que siempre se eligió otra alternativa.
+The original records began on 2026-09-25. This English documentation update is
+dated 2026-10-05. ADR-0013 records the later user-directed portable-document design;
+earlier single-vault, no-password, and export-only assumptions are explicitly
+identified where they no longer describe the implementation.

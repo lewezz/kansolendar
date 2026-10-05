@@ -1,21 +1,23 @@
-# ADR-0007 — Swift Concurrency y acceso de sesión aislado
+# ADR-0007: Actor ownership and session generations
+
+Documentation updated: 2026-10-05.
 
 ## Context
 
-La UI debe responder mientras se procesa SQLite o .ics. Swift 6 ofrece aislamiento/Sendable, pero la suspensión y cancelación todavía pueden producir carreras lógicas con bloqueo de bóveda.
+Asynchronous authentication and loading can complete after a window is locked or closed.
 
-## Decision
+## Decision reflected in the current source
 
-MainActor para presentación; un Storage actor dueño de conexión, clave y cachés. Valores Sendable en fronteras. Servicios async/await y tareas cancelables ligadas a generación de sesión. No await dentro de transacción. Al bloquear, ocultar UI, invalidar operaciones y vaciar consumidores; callbacks antiguos no repueblan vistas.
+Use MainActor for presentation, vault actors for storage, and generation IDs for key sessions and obsolete UI results. Keep transaction bodies synchronous and non-nested.
 
-## Alternatives
+## History and superseded assumptions
 
-Todo en MainActor bloquea UI. Actors por entidad complican atomicidad. GCD compartido manual y @unchecked Sendable generalizado eliminan comprobaciones útiles. Múltiples conexiones no se justifican inicialmente.
+Swift Concurrency was part of the original stack. Current isolation and generation checks are implemented. The original automatic-lock and cancel-every-task proposal is not implemented.
 
 ## Consequences
 
-Actor no garantiza hilo fijo ni convierte SQLite en API no bloqueante. Medir llamadas/lotes; executor dedicado solo si hace falta. Revalidar estado tras suspensión. La cancelación es cooperativa: no cerrar handle ni revocar memoria mientras código C sigue usándola. Swift no demuestra ausencia de todos los races de negocio.
+Actor isolation does not eliminate races across await or make C I/O nonblocking. UI tokens reject presentation results but do not cancel storage restoration. See [architecture](../architecture.md) and [testing](../testing.md).
 
 ## Status
 
-Tecnología fijada; estrategia de aislamiento/bloqueo propuesta, Q07. Referencia: [arquitectura](../architecture.md) y [pruebas](../testing.md).
+Implemented mechanisms; lifecycle integration still pending verification. Current verification limits are tracked in [testing](../testing.md).

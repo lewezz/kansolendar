@@ -1,21 +1,23 @@
-# ADR-0009 — Sin analytics, telemetría ni crash uploader
+# ADR-0009: No telemetry or remote diagnostics
+
+Documentation updated: 2026-10-05.
 
 ## Context
 
-Los horarios y hábitos son información privada incluso sin títulos. Recopilar uso y diagnósticos ampliaría salidas y dependencias. El producto exige ausencia de telemetría/analytics.
+Usage measurement and remote diagnostic services would move information outside the local calendar.
 
-## Decision
+## Decision reflected in the current source
 
-No SDKs, eventos de uso, IDs de instalación analíticos ni reportes enviados. Logger propio solo acepta catálogo técnico sin contenido/identificadores privados. Debug usa fixtures; no modo verbose que vuelque datos reales.
+Do not add analytics, advertising, telemetry SDKs, remote crash submissions, or startup version checks. Current errors are local UI messages.
 
-## Alternatives
+## History and superseded assumptions
 
-Analytics «anonimizados», opt-in, agregados o solo locales siguen contradiciendo alcance. Crash SDK filtra demasiado contexto por defecto y añade canal externo. Soporte manual futuro podría aceptar informes revisados, nunca DB automática.
+No analytics or telemetry was fixed by the original requirements. No persistent application logger or support-bundle facility has been implemented.
 
 ## Consequences
 
-Menos visibilidad de fallos en campo; invertir en tests locales y mensajes útiles. Unified Logging/diagnósticos de macOS tienen políticas propias que no podemos deshabilitar globalmente. No presentar OSLog.private como autorización para registrar eventos de calendario.
+Future diagnostics need explicit local design and sanitized categories. The app does not control operating-system diagnostics. See [errors and logging](../logging.md).
 
 ## Status
 
-Ausencia fijada por requisitos; allowlist propuesta en [logging.md](../logging.md). La auditoría de binario/artefactos forma parte de release.
+Implemented product boundary. Current verification limits are tracked in [testing](../testing.md).

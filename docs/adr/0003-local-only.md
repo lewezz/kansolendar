@@ -1,21 +1,23 @@
-# ADR-0003 — Sin backend y sin funciones de red
+# ADR-0003: Local operation without a backend
+
+Documentation updated: 2026-10-05.
 
 ## Context
 
-La privacidad debe depender del diseño y no de promesas de un servidor. La aplicación debe funcionar instalada, sin cuenta, conectividad ni servicio de disponibilidad externo.
+The user wants calendar ownership without trusting an account or server.
 
-## Decision
+## Decision reflected in the current source
 
-Toda la lógica y datos en el Mac. Sin backend, endpoints, Network.framework, red saliente/entrante, servidor localhost, servicios web, actualizador ni comprobación remota de licencia. Sandbox sin entitlements client/server. Auditar delegaciones de red mediante otras apps/servicios.
+Calendar use is local. No account, backend, app network API, or network entitlement is part of the implementation.
 
-## Alternatives
+## History and superseded assumptions
 
-Backend «privado», cifrado extremo a extremo con servidor y sincronización opt-in siguen introduciendo servicios y quedan fuera del producto. Un servidor local añade procesos/superficie sin necesidad.
+Offline operation was a product requirement, not a future option. Portable user-selected files extend local ownership without introducing a service.
 
 ## Consequences
 
-Actualizaciones manuales; recursos y ayuda locales. Notarización/publicación pueden necesitar Internet en entorno del desarrollador. El OS puede realizar su propio networking y usuarios pueden exportar a ubicaciones sincronizadas: no se promete controlar el Mac completo. Las pruebas deben comprobar ausencia de intentos, no solo funcionamiento desconectado.
+Backups and interchange are explicit file operations. Other software and the operating system can still use networks or synchronize user-selected directories. See [privacy](../privacy.md).
 
 ## Status
 
-Fijado por requisitos; mecanismos de verificación propuestos. Ver [privacy.md](../privacy.md). No hay backend «futuro» reservado.
+Implemented product boundary. Current verification limits are tracked in [testing](../testing.md).

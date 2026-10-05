@@ -1,21 +1,23 @@
-# ADR-0010 — .ics manual con perfil limitado y validado
+# ADR-0010: Limited iCalendar import and export
+
+Documentation updated: 2026-10-05.
 
 ## Context
 
-iCalendar es el formato requerido; su semántica temporal y extensiones exceden un MVP sin dependencias. Un parser que «aproxima» zonas/reglas puede alterar la agenda sin que se note.
+Interchange is useful, but a full calendar protocol introduces unsupported semantics and parser complexity.
 
-## Decision
+## Decision reflected in the current source
 
-MVP con exportador local acotado; **importación aplazada por decisión del propietario**. No parser, preview de entrada, comando de importación ni asociación para abrir .ics. Mantener el análisis de entrada hostil como referencia futura. No invitaciones ni URLs activas. Exportación zoned única a UTC y series zoned materializadas solo mediante elección explícita con advertencia; backup conserva fidelidad completa.
+Use a bounded native codec for VEVENT all-day and UTC inputs and corresponding plaintext exports. Reject unsupported semantics and duplicate properties; commit imports atomically.
 
-## Alternatives
+## History and superseded assumptions
 
-RFC completo aumenta mucho scope. Librería externa viola dependencia inicial. EventKit requiere integración del sistema no deseada y no es un codec puro para este producto. Ignorar propiedades temporales desconocidas se rechaza por corrección.
+The owner deferred import in the original 2026-09-25 scope. Later implementation includes a limited importer and UI panels, so export-only wording no longer describes the current source. This record preserves that change rather than treating broad interoperability as complete.
 
 ## Consequences
 
-Ningún calendario externo se importa en el MVP; se reduce superficie y esfuerzo de parser. Sin compatibilidad universal prometida. Contenido exportado es legible; el sistema puede indexarlo/sincronizarlo. Límites y pérdidas de exportación se hacen visibles antes de escribir. Restauración de backup permanece incluida. Añadir importación exige revisar perfil y pruebas en otra fase, sin asumir fecha comprometida.
+Recurrence, TZID/floating input, alarms, attachments, and attendee semantics are unsupported. Zoned output becomes UTC; .ics is not an encrypted backup. See [iCalendar](../icalendar.md).
 
 ## Status
 
-Formato fijado. El diseño inicial incluía importación; **el propietario la aplaza el 2026-09-25** («no hace falta importar calendarios de momento»). Q05 queda resuelta para el alcance inicial; los detalles de exportación siguen propuestos. Referencia contractual: [icalendar.md](../icalendar.md).
+Limited import/export implemented in source. Current verification limits are tracked in [testing](../testing.md).

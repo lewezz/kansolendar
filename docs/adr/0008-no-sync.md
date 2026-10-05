@@ -1,21 +1,23 @@
-# ADR-0008 — Sin sincronización ni cuentas
+# ADR-0008: No application-managed synchronization
+
+Documentation updated: 2026-10-05.
 
 ## Context
 
-El producto definido debe ser independiente, local y sin cuentas. Sincronización introduce identidades, conflictos, credenciales, transporte y disponibilidad externa, aunque sea opt-in.
+Calendar data should stay under local file ownership without a service or synchronization engine.
 
-## Decision
+## Decision reflected in the current source
 
-No CloudKit/iCloud, CalDAV, Google, Outlook, cuentas, replicación ni sincronización LAN. .ics es exportación manual en el MVP; su importación está aplazada por decisión del propietario. Backup/restore es recuperación deliberada, no merge continuo. No tokens, campos serverID, tombstones de sync ni capa de adaptadores futura.
+Do not implement CloudKit, CalDAV, subscriptions, background synchronization, or a remote conflict-resolution service.
 
-## Alternatives
+## History and superseded assumptions
 
-Sync E2E o solo LAN preservaría parte de confidencialidad pero viola alcance y añade problemas de convergencia. Usar carpeta sincronizada como DB activa no es sustituto seguro y se rechaza.
+No synchronization was an original product requirement. Named portable vaults change document ownership, not that requirement.
 
 ## Consequences
 
-Cambios en dos Macs no se combinan automáticamente. UID sirve a intercambio limitado, no reconciliación distribuida. Restaurar copia puede reemplazar datos posteriores mediante elección explícita. El usuario conserva control de sus exportaciones, incluyendo copias externas, fuera de garantías de la app.
+Users can copy files themselves or select externally synchronized folders. Copies retain identity and are not automatically merged or kept fresh. See [vault files](../kanso-vault-files.md).
 
 ## Status
 
-Fijado por requisitos. Reconsiderarlo sería redefinir producto, no activar una opción escondida. Ver [MVP](../mvp.md).
+Implemented product boundary. Current verification limits are tracked in [testing](../testing.md).

@@ -1,21 +1,23 @@
-# ADR-0002 — SQLite explícito, sin SwiftData ni ORM
+# ADR-0002: System SQLite with encrypted payloads
+
+Documentation updated: 2026-10-05.
 
 ## Context
 
-El producto necesita persistencia local fiable, control de archivos auxiliares y migraciones, y una frontera clara para cifrar antes de escribir. SQLite es requisito; SwiftData y ORM se excluyen inicialmente.
+Local persistence must preserve transactions without a remote dependency or ORM.
 
-## Decision
+## Decision reflected in the current source
 
-SQLite del SDK mediante API C encapsulada en Storage. Esquema pequeño y repositorios de negocio; statements preparados, conexión única aislada y migraciones explícitas. No añadir otra distribución de SQLite, extensión ni paquete remoto.
+Use system SQLite through the local CSQLite shim. Encrypt domain payloads before SQL. SQLiteVaultDatabase owns storage orchestration; SQLiteConnection owns the C handle and short synchronous transactions.
 
-## Alternatives
+## History and superseded assumptions
 
-SwiftData/Core Data simplifican modelado pero no cumplen la elección ni garantizan el cifrado requerido. ORM facilita SQL a costa de superficie y dependencia. Archivos JSON planos complican transacciones/integridad y no son la persistencia elegida.
+SQLite over SwiftData/ORM was fixed by the initial stack. The schema now exists: local user_version 1 and portable user_version 2. Earlier single-location and future-schema assumptions are superseded.
 
 ## Consequences
 
-Hay que gestionar correctamente ownership de buffers, errores, FK, transacciones y versiones. SQLite de cada macOS puede diferir: capacidades se verifican. Cifrar payloads impide índices SQL sobre contenido; se acepta coste en RAM sujeto a Q02. El esquema no expone fechas por conveniencia.
+SQL structure and relationships remain visible. There is no custom page-encryption codec, FTS index, or generic repository framework. See [database](../database.md).
 
 ## Status
 
-Tecnología fijada por requisitos. Diseño físico propuesto, dependiente de ADR-0004. Referencia: [database.md](../database.md).
+Implemented in source. Current verification limits are tracked in [testing](../testing.md).

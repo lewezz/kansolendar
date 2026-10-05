@@ -4,56 +4,53 @@
 
 <h1 align="center">Kansolendar</h1>
 
-<p align="center">
-  A private, offline-first calendar for macOS.
-</p>
+<p align="center">A private, offline calendar for macOS.</p>
 
-Kansolendar is a native calendar application designed to keep your schedule on your Mac. It does not require an account, cloud service, subscription, analytics system, or internet connection.
+Kansolendar is a native SwiftUI calendar that stores your data locally. It has no
+accounts, backend, analytics, or app-managed synchronization.
 
-Your calendars and events are stored in a local encrypted vault. Access to its encryption key is protected by macOS Keychain and can be authorized with Touch ID or your Mac password.
+Create independent `.kanso` vault files, choose their names and locations, and
+protect each with your own password. Each file can contain multiple calendars.
+The existing Application Support vault remains available separately and uses
+macOS Keychain.
 
-## Features
+## Current features
 
-- Day, week, month, and year calendar views
-- Create, edit, move, and delete events
-- Multiple calendars with custom colors
-- All-day and scheduled events
-- Light and dark appearance modes
-- Custom accent colors
-- Local search
-- Encrypted backups and recovery kits
-- Safe backup restoration
-- Local iCalendar (`.ics`) import and export
-- No accounts, advertising, analytics, or network access
+- Day, week, month, and year views, calendar filters, and title search.
+- Create and delete calendars; create, edit, delete, and move events.
+- All-day and timed events, notes, locations, and calendar colors.
+- Independent password-protected `.kanso` documents and separate document windows.
+- Encrypted backups, separate recovery kits, and validated restoration.
+- Limited iCalendar import and export through file panels.
+- Local appearance and accent settings.
 
-## Privacy
+The project targets Apple Silicon and macOS 14 or later. Its implementation uses
+Swift 6, SwiftUI, Foundation, CryptoKit, CommonCrypto, Security, and system SQLite,
+with a local Swift package and no remote package dependencies.
 
-Kansolendar is built around local ownership of calendar data:
+## Using vault files
 
-- Event details are encrypted before being written to SQLite.
-- The encryption key is stored in the macOS Data Protection Keychain.
-- Unlocking requires local user authentication.
-- Backups contain encrypted data and require a separate recovery kit.
-- The application has no client or server network entitlement.
+Choose **Create Vault File…** or **Vault → Create New Vault File…**, select a name
+and location, then enter and confirm a password of at least 15 characters. Use
+**Open Vault File…** to reopen a document. Finder file association is declared in
+the app, but still needs validation on the latest application build.
 
-An exported `.ics` file is intentionally unencrypted and should be handled like any other document containing personal information.
+Kansolendar offers to copy a new password and open Apple Passwords. You add it
+there manually. Touch ID can retrieve it in Passwords; Kansolendar itself asks for
+the vault password. This is not a passkey or automatic Passwords integration.
 
-## Requirements
+Event payloads are encrypted before SQLite writes. Database structure, identifiers,
+relationships, counts, and sizes remain visible. Recovery kits contain the actual
+data key, and exported `.ics` files contain plaintext event details.
 
-- macOS 14 or later
-- Apple Silicon Mac
-- Touch ID or the Mac login password for protected vault access
+## Project status
 
-## Installation
+The features above are present in source. The latest refactors have had static
+checks only; compilation, package tests, signed-app integration, Finder opening,
+and multi-window behavior have not been reverified for the current working tree.
+There is one app target and one shared app scheme. No distribution package or
+release workflow is currently established.
 
-Download the latest `.dmg`, open it, and drag `Kansolendar.app` into the Applications folder.
-
-Current development builds are distributed without Apple notarization. macOS may require approving the application from **System Settings → Privacy & Security → Open Anyway** after the first launch.
-
-## Technology
-
-Kansolendar is built with Swift 6, SwiftUI, CryptoKit, the macOS Security framework, and system SQLite. It has no remote package dependencies.
-
-## Status
-
-Kansolendar 1.0 currently supports Apple Silicon. Distribution is manual and updates do not contact a server automatically.
+Start with the [documentation index](docs/README.md), [vault guide](docs/kanso-vault-files.md),
+or [maintainer guide](docs/code-structure.md). The maintained
+[product specification](kansolendar.md) records scope and current limitations.

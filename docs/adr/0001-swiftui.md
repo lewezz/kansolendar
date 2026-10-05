@@ -1,21 +1,23 @@
-# ADR-0001 — SwiftUI para aplicación macOS nativa
+# ADR-0001: Native SwiftUI application
+
+Documentation updated: 2026-10-05.
 
 ## Context
 
-El producto debe ser una .app convencional y autónoma. El stack exige Swift 6 y SwiftUI, sin runtime externo ni web empaquetada. La UI debe poder ocultar todo el contenido privado al bloquear.
+The product needs a conventional macOS application without a web runtime or external interpreter.
 
-## Decision
+## Decision reflected in the current source
 
-Usar SwiftUI para escenas, vistas y navegación; ViewModels en MainActor. Adaptadores AppKit pequeños para paneles/ciclo de ventanas o controles de privacidad que SwiftUI no exponga suficientemente. No sustituir la UI por AppKit completo ni importar frameworks de navegador.
+Use Swift 6 and SwiftUI for the macOS app, with focused AppKit adapters for native file panels and system actions. Configuration targets macOS 14 and arm64.
 
-## Alternatives
+## History and superseded assumptions
 
-AppKit completo da más control pero contradice la elección de UI y eleva coste inicial. Electron/WebView/runtime externo incumplen requisitos. Un wrapper web no cumple la superficie nativa deseada.
+The native stack and Apple Silicon-only scope were established in the original requirements. The current project implements one app target; the original future-project wording is obsolete.
 
 ## Consequences
 
-Accesibilidad y comportamiento macOS deben probarse, no darse por resueltos por el framework. No usar DocumentGroup/SceneStorage para datos privados. El mínimo macOS y APIs concretas se decidirán antes del skeleton. UI declarativa puede retener valores: limpiar todos los estados al bloquear.
+Views, forms, and appearance stay in the app layer. Core and Storage remain UI-independent. Latest app compilation and OS behavior still need verification.
 
 ## Status
 
-SwiftUI/Swift 6 fijados por requisitos. Uso de adaptadores y mínimo macOS propuestos; Q06/Q07 pendientes. Ver [arquitectura](../architecture.md).
+Implemented in source. Current verification limits are tracked in [testing](../testing.md).

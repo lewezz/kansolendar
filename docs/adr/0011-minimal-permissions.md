@@ -1,21 +1,23 @@
-# ADR-0011 — Sandbox y mínimo acceso al sistema
+# ADR-0011: Sandbox and selected-file access
+
+Documentation updated: 2026-10-05.
 
 ## Context
 
-Un calendario independiente no necesita leer calendarios Apple ni permisos de contactos/localización. Integraciones del sistema pueden producir copias indirectas y nuevos procesos con acceso al contenido.
+Independent file-based calendars need controlled document access without reading system calendars or granting broad disk access.
 
-## Decision
+## Decision reflected in the current source
 
-Sandbox activo con acceso a archivos elegidos y Keychain de identidad propia; sin red ni permisos amplios. Sin notificaciones/recordatorios en MVP, Core Spotlight, Quick Look provider, recientes privados, extensiones ni widgets. Mantener accesibilidad de UI y retirarla al bloquear.
+Declare the app sandbox, user-selected file read/write access, and the app's Keychain group. Keep network and unrelated system-service entitlements absent.
 
-## Alternatives
+## History and superseded assumptions
 
-Desactivar sandbox para simplificar ficheros reduce defensa. Full Disk Access/bookmarks persistentes no están justificados. Avisos con títulos son cómodos pero trasladan datos fuera del control de sesión. Desactivar accesibilidad no impide capturas y perjudica uso legítimo.
+Minimal permissions were in the initial design. Current entitlements and file panels implement that boundary; portable document access is now part of the lifecycle.
 
 ## Consequences
 
-Exportación y backup/restore mediante paneles explícitos; importación de calendarios aplazada, sin comandos ni asociación de apertura .ics. Añadir recordatorios exigiría nuevo análisis y autorización de notificaciones al activar, no APNs. No prometer controlar todo Spotlight/Quick Look/clipboard/OS. Release debe auditar entitlements y artefactos reales en todas las versiones soportadas.
+No EventKit, contacts, location, notification, or broad disk entitlement exists. Source declarations require verification on the eventual signed artifact. Clipboard/export/OS behavior remains outside vault encryption. See [privacy](../privacy.md).
 
 ## Status
 
-Propuesto, consistente con requisitos; integración y señales por verificar en Q07/Q09. Referencia: [privacy.md](../privacy.md).
+Implemented declarations; signed integration pending verification. Current verification limits are tracked in [testing](../testing.md).

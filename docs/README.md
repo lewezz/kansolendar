@@ -1,47 +1,36 @@
-# Kansolendar — arquitectura y documentación
+# Kansolendar documentation
 
-Fecha: 25 de septiembre de 2026. Estado: **propuesta completa para revisión; no autoriza implementación**.
+Updated: 2026-10-05. These guides describe the current working tree. Implemented
+means present in source; it does not imply the latest refactors have passed
+compilation or runtime tests. See [verification status](testing.md).
 
-Revisión parcial aceptada por el propietario: cifrado del contenido con metadatos visibles, autenticación de macOS y archivo de recuperación separado. Además, importación de calendarios aplazada y soporte exclusivo Apple silicon, sin Intel. Véanse Q01/Q03/Q04/Q05/Q06 en [registro de decisiones](open-questions.md). Permanecen pendientes macOS/Xcode/SDK, validación técnica, otras decisiones y autorización de implementación.
+## Using the application
 
-El repositorio de partida contiene únicamente [los requisitos](../kansolendar.md). No hay aplicación, proyecto Xcode, esquema ejecutable ni pruebas que auditar. Esta entrega añade exclusivamente documentación. Las políticas descritas son requisitos de la futura implementación, no garantías verificadas de un producto existente.
+| Topic | Guide |
+| --- | --- |
+| Product overview and current scope | [Overview](executive-summary.md), [feature scope](mvp.md) |
+| Create, open, name, and move vaults | [Portable `.kanso` vaults](kanso-vault-files.md) |
+| Passwords, Apple Passwords, and the local Keychain vault | [Key management](key-management.md) |
+| Encrypted backups and recovery | [Backups](backups.md) |
+| Supported calendar interchange | [iCalendar](icalendar.md) |
+| Data exposure and permissions | [Security](security.md), [privacy](privacy.md) |
+| App target and distribution status | [Distribution](distribution.md) |
 
-## Lectura recomendada
+## Maintaining the application
 
-1. [Resumen ejecutivo](executive-summary.md) y [MVP](mvp.md).
-2. [Modelo de amenazas](threat-model.md), elaborado como fundamento de las decisiones.
-3. [Arquitectura](architecture.md) y [decisiones pendientes](open-questions.md).
-4. [Dominio](data-model.md), [SQLite](database.md), [seguridad](security.md) y [claves](key-management.md).
-5. [Privacidad y permisos](privacy.md), [intercambio .ics](icalendar.md), [backups](backups.md) y [errores/logs](logging.md).
-6. [Testing](testing.md), [distribución](distribution.md), [roadmap](roadmap.md) y [ADRs](adr/README.md).
+| Topic | Guide |
+| --- | --- |
+| Source ownership and extension points | [Code structure](code-structure.md) |
+| Module dependencies and lifecycle | [Architecture](architecture.md) |
+| Calendar, event, and time semantics | [Domain model](data-model.md) |
+| Schemas, encrypted records, and transactions | [Database](database.md) |
+| Threat boundaries and known limitations | [Threat model](threat-model.md) |
+| Error presentation and diagnostics | [Errors and logging](logging.md) |
+| Existing tests and pending verification | [Testing](testing.md) |
+| Remaining work and sequence | [Open work](open-questions.md), [roadmap](roadmap.md) |
+| Decisions and superseded assumptions | [Architecture decision records](adr/README.md) |
 
-## Convenciones y precedencia
-
-- **Fijado por requisitos**: stack y exclusiones indicados por el propietario del producto.
-- **Propuesto**: elección de esta arquitectura, pendiente de revisión. No equivale a aceptación del usuario.
-- **Gate**: condición que debe resolverse antes de iniciar la fase indicada.
-- **Fuera del MVP**: no crear permisos, tablas, servicios ni dependencias para esa función ahora.
-- **Límite**: propiedad que esta aplicación no puede garantizar frente al sistema o un atacante.
-
-Los requisitos prevalecen. `open-questions.md` identifica conflictos, sin alterar el stack. Los documentos especializados son la referencia de cada contrato; los ADRs registran el motivo y el estado. Si cambia cifrado, claves o representación temporal, deben revisarse conjuntamente dominio, esquema, backups, pruebas y ADRs.
-
-## Respuestas rápidas
-
-| Pregunta | Respuesta propuesta | Detalle |
-|---|---|---|
-| ¿Estructura? | App SwiftUI/MVVM, núcleo de dominio, adaptadores locales | [Arquitectura](architecture.md) |
-| ¿Dónde están los datos? | Application Support del contenedor sandbox, SQLite | [Base de datos](database.md) |
-| ¿Cifrado? | Payloads sensibles con AES-256-GCM antes de SQLite; no cifrado integral del archivo | [Seguridad](security.md) |
-| ¿Claves? | Una clave aleatoria por bóveda en Keychain local; recuperación manual separada | [Claves](key-management.md) |
-| ¿Quién lee contenido? | El proceso autorizado mientras está desbloqueado; no protección absoluta ante malware privilegiado | [Amenazas](threat-model.md) |
-| ¿Permisos? | Sandbox, archivos seleccionados y acceso Keychain de la propia identidad | [Privacidad](privacy.md) |
-| ¿Internet? | Sin funciones ni entitlements de red; el sistema operativo conserva sus propias capacidades | [Privacidad](privacy.md) |
-| ¿DB copiada? | Contenido ilegible sin clave; estructura, tamaños y relaciones visibles | [Seguridad](security.md) |
-| ¿Backups? | Snapshot consistente de SQLite con payloads cifrados; clave separada obligatoria para portabilidad | [Backups](backups.md) |
-| ¿Migraciones? | Versionadas, transaccionales, con copia previa y sin downgrade automático | [Base de datos](database.md) |
-| ¿Eventos/recurrencias? | Instantes, fechas civiles y zona explícitos; expansión acotada | [Dominio](data-model.md) |
-| ¿.ics? | Exportación limitada; importación aplazada y documentada solo como referencia futura | [.ics](icalendar.md) |
-| ¿Verificación? | Pruebas de datos, seguridad y privacidad sobre binario firmado | [Testing](testing.md) |
-| ¿Distribución? | Xcode → .app firmada y notarizada → DMG opcional | [Distribución](distribution.md) |
-
-Las referencias técnicas oficiales se enlazan junto a las afirmaciones relevantes. Su consulta se realizó para diseñar esta documentación; **no implica que la aplicación vaya a acceder a esas URL**. La política concreta de Kansolendar se distingue de las capacidades generales de esas APIs.
+The [root README](../README.md) introduces the app. The maintained
+[product specification](../kansolendar.md) defines scope. ADRs record history;
+current guides and source explain today's behavior. They no longer assume a
+future project, a single fixed vault, or export-only iCalendar support.
