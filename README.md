@@ -11,7 +11,7 @@ Requires an **Apple Silicon Mac (M1 or later) with macOS 14 or later**. This bui
 supports arm64; it does not run on Intel Macs.
 
 1. Open this repository's **Releases** page and download the
-   `Kansolendar-<version>-macOS-arm64.zip` asset. Do not download the source-code ZIP.
+   `kansolendar-N.Nv.zip` asset. Do not download the source-code ZIP.
 2. Double-click the ZIP to extract **Kansolendar.app**.
 3. Drag **Kansolendar.app** into your **Applications** folder.
 4. Open Kansolendar from Applications.
