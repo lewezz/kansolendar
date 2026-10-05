@@ -10,11 +10,15 @@ No accounts, servers, app-managed synchronization, analytics, or telemetry.
 Requires an **Apple Silicon Mac (M1 or later) with macOS 14 or later**. This build
 supports arm64; it does not run on Intel Macs.
 
-1. Open this repository's **Releases** page and download the
-   `kansolendar-N.Nv.zip` asset. Do not download the source-code ZIP.
-2. Double-click the ZIP to extract **Kansolendar.app**.
-3. Drag **Kansolendar.app** into your **Applications** folder.
-4. Open Kansolendar from Applications.
+1. Open this repository's **Releases** page and download the app's `.dmg` asset
+   (for example, `kansolendar-1.0v.dmg`). Do not download the source-code ZIP.
+2. Double-click the DMG to open it.
+3. Drag **Kansolendar.app** onto the **Applications** shortcut inside the image.
+4. Eject the Kansolendar disk image, then open Kansolendar from Applications.
+
+If you download the app's `.zip` asset instead (named `kansolendar-N.Nv.zip`),
+double-click it to extract **Kansolendar.app**, then drag the app into your
+Applications folder.
 
 ### First opening: allow this app in macOS
 
