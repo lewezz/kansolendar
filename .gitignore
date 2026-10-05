@@ -1,5 +1,21 @@
-# Local agent workflow state
+# Local agent tools and workflow state
+/.codex/
+/codex/
+/AGENTS.md
 .orchestrator/
+
+# Private vaults and calendar data, including renamed copies and sidecars
+*.[kK][aA][nN][sS][oO]
+*.[kK][aA][nN][sS][oO].*
+*.kansobackup
+*.kansorecovery
+*.[iI][cC][sS]
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.db
+*.db-*
 
 # Secrets and machine-local configuration
 .env
@@ -9,11 +25,24 @@
 *.key
 *.crt
 *.p12
+*.pfx
+*.p8
+*.cer
+*.der
+*.mobileprovision
+*.provisionprofile
+.netrc
+.npmrc
+credentials.json
+secrets.json
+*.local.xcconfig
 
 # Logs and temporary files
 *.log
 *.tmp
 *.temp
+*.crash
+*.ips
 tmp/
 temp/
 
@@ -49,14 +78,18 @@ build/
 coverage/
 .next/
 .turbo/
+*.app/
+*.dSYM/
+*.xcarchive/
+*.xcresult/
+*.trace/
+*.ipa
+*.pkg
+*.dmg
+*.zip
+*.zip.sha256
+*.dmg.sha256
 
 # Xcode user-local state
 xcuserdata/
 *.xcuserstate
-
-# Generated Codex control-plane outputs
-.codex/evals/results/
-
-# codex-workflow generated files
-**/__pycache__/
-.codex/evals/results/*.json
