@@ -16,12 +16,19 @@ struct CalendarWorkspaceView: View {
     @State private var eventPendingDeletion: Event?
     @State private var calendarPendingDeletion: LocalCalendar?
     @State private var searchText = ""
-    @State private var isConfirmingRecoveryExport = false
-    @State private var restoreSelection: (backup: URL, kit: URL)?
-    @State private var isConfirmingRestore = false
     @State private var selectedDate = CivilDate.localToday
     @State private var displayedMonth = CalendarMonth(containing: CivilDate.localToday)
     @State private var viewMode: CalendarViewMode = .month
+
+    /// Explicit text avoids the native toolbar automatically reducing Labels to icons.
+    private func toolbarLabel(_ title: String, symbol: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: symbol).accessibilityHidden(true)
+            Text(title)
+        }
+        .padding(.horizontal, 6).padding(.vertical, 3).fixedSize()
+        .accessibilityElement(children: .ignore).accessibilityLabel(title)
+    }
 
     private var visibleEvents: [VaultEvent] {
         let calendarEvents = selectedCalendarID.map { calendarID in
@@ -95,67 +102,28 @@ struct CalendarWorkspaceView: View {
         .searchable(text: $searchText, placement: .toolbar, prompt: "Search by title")
         .toolbar {
             ToolbarItemGroup {
-                Menu("Vault", systemImage: "lock.doc") {
-                    if let fileName = model.portableFileURL?.deletingPathExtension().lastPathComponent {
-                        Text(fileName)
-                    }
-                    Button("Create New Vault File…", systemImage: "doc.badge.plus") {
-                        guard let url = ExportPanel.chooseKansoDestination() else { return }
-                        openWindow(id: "kanso-vault", value: url)
-                    }
-                    Button("Open Vault File…", systemImage: "doc.badge.arrow.up") {
-                        guard let url = ExportPanel.chooseKansoToOpen() else { return }
-                        openWindow(id: "kanso-vault", value: url)
-                    }
-                }
+                Button {
+                    guard let url = VaultFilePanel.chooseKansoDestination() else { return }
+                    openWindow(id: "kanso-vault", value: url)
+                } label: { toolbarLabel("New Vault", symbol: "doc.badge.plus") }
+                Button {
+                    guard let url = VaultFilePanel.chooseKansoToOpen() else { return }
+                    openWindow(id: "kanso-vault", value: url)
+                } label: { toolbarLabel("Open Vault", symbol: "folder") }
 
-                Button("New Event", systemImage: "plus") {
+                Button {
                     editorEvent = nil
                     isPresentingEventEditor = true
-                }
+                } label: { toolbarLabel("New Event", symbol: "plus") }
                 .disabled(model.calendars.isEmpty)
                 .keyboardShortcut("n", modifiers: .command)
 
-                Button("Lock", systemImage: "lock") {
+                Button {
                     model.lock()
-                }
+                } label: { toolbarLabel("Lock", symbol: "lock") }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
 
-                Menu("Export", systemImage: "square.and.arrow.up") {
-                    Button("Encrypted Backup…", systemImage: "externaldrive") {
-                        guard let url = ExportPanel.chooseBackupDestination() else { return }
-                        Task { await model.createBackup(at: url) }
-                    }
-                    Button("Recovery Kit…", systemImage: "key") {
-                        isConfirmingRecoveryExport = true
-                    }
-                    Divider()
-                    Button("Export Selected Calendar…", systemImage: "calendar.badge.arrowtrianglehead.up") {
-                        guard let calendar = selectedCalendar else { return }
-                        guard let url = ExportPanel.chooseCalendarDestination(calendarName: calendar.name) else { return }
-                        Task { await model.exportCalendar(id: calendar.id, to: url) }
-                    }
-                    .disabled(selectedCalendar == nil)
-                }
-                .disabled(model.isExporting)
-
-                Menu("Import", systemImage: "square.and.arrow.down") {
-                    Button("Restore Encrypted Backup…", systemImage: "externaldrive.badge.timemachine") {
-                        guard let backup = ExportPanel.chooseBackupForRestore(),
-                              let kit = ExportPanel.chooseRecoveryKitForRestore() else { return }
-                        restoreSelection = (backup, kit)
-                        isConfirmingRestore = true
-                    }
-                    Button("Import Events into Selected Calendar…", systemImage: "calendar.badge.plus") {
-                        guard let calendarID = selectedCalendarID,
-                              let url = ExportPanel.chooseCalendarToImport() else { return }
-                        Task { await model.importCalendarEvents(from: url, into: calendarID) }
-                    }
-                    .disabled(selectedCalendarID == nil)
-                }
-                .disabled(model.isExporting)
-
-                Menu("Appearance", systemImage: selectedAppearance.systemImage) {
+                Menu {
                     Picker("Mode", selection: $appearance) {
                         ForEach(AppAppearance.allCases) { option in
                             Label(option.localizedName, systemImage: option.systemImage)
@@ -169,10 +137,11 @@ struct CalendarWorkspaceView: View {
                                 .tag(option.rawValue)
                         }
                     }
-                }
+                } label: { toolbarLabel("Appearance", symbol: selectedAppearance.systemImage) }
                 .accessibilityLabel("Change appearance")
             }
         }
+        .labelStyle(.titleAndIcon)
         .task { await model.loadContent() }
         .sheet(isPresented: $isPresentingCalendarEditor) {
             CalendarEditorSheet(model: model)
@@ -206,29 +175,7 @@ struct CalendarWorkspaceView: View {
             let count = model.events.filter { $0.event.calendarID == calendar.id }.count
             Text("“\(calendar.name)” and its \(count) \(count == 1 ? "event" : "events") will be permanently deleted.")
         }
-        .confirmationDialog(
-            "The kit can decrypt any copy of this vault",
-            isPresented: $isConfirmingRecoveryExport,
-            titleVisibility: .visible
-        ) {
-            Button("Choose Location…") {
-                guard let url = ExportPanel.chooseRecoveryKitDestination() else { return }
-                Task { await model.exportRecoveryKit(at: url) }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Store it separately from the backup. Anyone with both files can read the calendar.")
-        }
-        .alert("Replace the current encrypted vault?", isPresented: $isConfirmingRestore) {
-            Button("Cancel", role: .cancel) { restoreSelection = nil }
-            Button("Validate and Restore", role: .destructive) {
-                guard let selection = restoreSelection else { return }
-                restoreSelection = nil
-                Task { await model.restoreBackup(at: selection.backup, recoveryKitURL: selection.kit) }
-            }
-        } message: {
-            Text("Kansolendar will fully validate the backup and recovery kit first. If validation fails, the current vault remains unchanged.")
-        }
+
     }
 
     private var selectedCalendar: LocalCalendar? {

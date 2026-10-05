@@ -5,6 +5,8 @@ import SwiftUI
 struct RootView: View {
     @Environment(\.appAccentColor) private var appAccentColor
     @Environment(\.openWindow) private var openWindow
+    @AppStorage(VaultRecentFiles.enabledKey) private var rememberRecentFiles = false
+    @State private var recentFiles: [URL] = []
     @State private var model: VaultViewModel
 
     init(portableFileURL: URL? = nil) {
@@ -20,204 +22,249 @@ struct RootView: View {
             }
         }
         .frame(minWidth: 1_100, minHeight: 700)
+        .background(VaultWindowAttachment(model: model).frame(width: 0, height: 0))
         .task { await model.start() }
+        .onAppear { recentFiles = VaultRecentFiles.urls }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            recentFiles = VaultRecentFiles.urls
+        }
         .onOpenURL { url in
-            guard url.isFileURL, url.pathExtension.lowercased() == "kanso" else { return }
+            guard KansoOpenPanelFilter.accepts(url) else { return }
             guard model.portableFileURL?.standardizedFileURL != url.standardizedFileURL else { return }
             openWindow(id: "kanso-vault", value: url)
         }
         .onDisappear { model.closeDocument() }
-        .sheet(item: $model.passwordSheet) { sheet in
-            if sheet == .save, let password = model.passwordToSave {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Save your vault password").font(.title2.weight(.semibold))
-                    Text("Copy your password and save it in Apple Passwords. Later, retrieve it with Touch ID or your Mac password and paste it to unlock. Kansolendar cannot save it directly to Passwords.")
-                        .foregroundStyle(.secondary)
-                    Text(password)
-                        .font(.system(.body, design: .monospaced)).textSelection(.enabled)
-                        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-                    HStack {
-                        Button("Copy & open Passwords") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(password, forType: .string)
-                            model.openPasswords()
-                        }.buttonStyle(.borderedProminent)
-                        Button("Done") { model.finishPasswordPresentation() }
-                    }
-                    Text("If you lose both this password and your recovery kit, the vault cannot be opened.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }.padding(24).frame(width: 480)
-            } else {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Choose a password for the restored vault")
-                        .font(.title2.weight(.semibold))
-                    SecureField("Password (at least 15 characters)", text: $model.passwordInput)
-                    SecureField("Confirm password", text: $model.passwordConfirmation)
-                    Text("Use at least 15 characters. Spaces and symbols are allowed; avoid reusing another password.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text("Use a long, unique password. You can save it in Apple Passwords after restoring.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Button("Restore and continue") { model.restorePendingBackup() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!model.canCreatePassword || model.isBusy)
-                }.padding(24).frame(width: 440)
-            }
+        .sheet(item: $model.passwordSheet) { _ in
+            VaultPasswordView(model: model)
+                .interactiveDismissDisabled()
         }
-        .interactiveDismissDisabled(model.passwordSheet != nil)
     }
 
     private var vaultGate: some View {
-        VStack(spacing: 18) {
-            Image("KansolendarLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 72, height: 72)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(appAccentColor.opacity(0.35), lineWidth: 1)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 32) {
+                HStack(spacing: 14) {
+                    Image("KansolendarLogo")
+                        .resizable().scaledToFit().frame(width: 48, height: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(KansolendarBuildInfo.productName).font(.title2.weight(.semibold))
+                        Text("PRIVATE CALENDARS")
+                            .font(.caption.weight(.medium)).tracking(1.5).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Label("Offline", systemImage: "lock.shield")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-                .accessibilityHidden(true)
 
-            Text(model.displayName ?? KansolendarBuildInfo.productName)
-                .font(.largeTitle.monospaced().weight(.semibold))
-                .tracking(1.2)
+                if model.isPortableDocument {
+                    documentGate
+                } else {
+                    welcome
+                }
 
-            Text("LOCAL / ENCRYPTED / OFFLINE")
-                .font(.caption.monospaced().weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            statePanel
-                .padding(.top, 8)
-
-            if !model.isPortableDocument {
+                if let message = model.message {
+                    Label(message, systemImage: "info.circle")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(appAccentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+                        .accessibilityIdentifier("vault-message")
+                }
+                Divider()
                 HStack {
-                    Button("Create Vault File…", systemImage: "doc.badge.plus") { createKansoFile() }
-                    Button("Open Vault File…", systemImage: "doc.badge.arrow.up") { openKansoFile() }
+                    Label("Encrypted files. Independent passwords.", systemImage: "lock.doc")
+                    Spacer()
+                    Text("No accounts · No servers · No sync")
                 }
-                .buttonStyle(.bordered)
+                .font(.caption).foregroundStyle(.secondary)
             }
-
-            if let message = model.message {
-                Text(message)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 360)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(appAccentColor.opacity(0.07), in: Capsule())
-                    .accessibilityIdentifier("vault-message")
-            }
-
-            Text("Your calendar stays on this Mac. No accounts. No servers. No sync.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .padding(.top, 4)
+            .padding(48).frame(maxWidth: 960)
+            .frame(maxWidth: .infinity)
         }
-        .frame(minWidth: 520, minHeight: 360)
-        .padding(32)
-        .background(appAccentColor.opacity(0.025))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var welcome: some View {
+        VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Your time, kept private.")
+                    .font(.system(size: 36, weight: .semibold))
+                Text("Keep your calendars in a password-protected .kanso file. Choose where it lives and open it whenever you need it.")
+                    .font(.body).foregroundStyle(.secondary).frame(maxWidth: 600, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(alignment: .top, spacing: 18) {
+                welcomeAction(title: "Create a vault", description: "Start with a new file, your own name and a unique password.", symbol: "doc.badge.plus", primary: true, action: createKansoFile)
+                welcomeAction(title: "Open a vault", description: "Choose an existing .kanso file and unlock it with its password.", symbol: "folder", primary: false, action: openKansoFile)
+            }
+            if rememberRecentFiles {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Recent vaults").font(.headline)
+                        Spacer()
+                        if !recentFiles.isEmpty {
+                            Button("Clear history") { VaultRecentFiles.clear() }.buttonStyle(.link)
+                        }
+                    }
+                    if recentFiles.isEmpty {
+                        Text("Files you open will appear here.").foregroundStyle(.secondary)
+                    } else {
+                        ForEach(recentFiles, id: \.self) { url in
+                            Button {
+                                openWindow(id: "kanso-vault", value: url)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "lock.doc").foregroundStyle(appAccentColor)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(url.deletingPathExtension().lastPathComponent).font(.body.weight(.medium))
+                                        Text((url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath)
+                                            .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                                }
+                                .padding(12).contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func welcomeAction(title: String, description: String, symbol: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Image(systemName: symbol).font(.title2).foregroundStyle(appAccentColor).accessibilityHidden(true)
+            Text(title).font(.title3.weight(.semibold))
+            Text(description).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            if primary {
+                Button("Create Vault…", action: action).buttonStyle(.borderedProminent).controlSize(.large)
+            } else {
+                Button("Open Vault…", action: action).buttonStyle(.bordered).controlSize(.large)
+            }
+        }
+        .padding(24).frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(appAccentColor.opacity(primary ? 0.3 : 0.1)))
+    }
+
+    private var documentGate: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(model.displayName ?? "Calendar vault").font(.largeTitle.weight(.semibold))
+                Text(model.vaultState == .notCreated ? "Choose a unique password for this vault." : "Unlock your calendars with this file’s password.")
+                    .foregroundStyle(.secondary)
+            }
+            statePanel
+        }
+        .padding(28).frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 16))
     }
 
     @ViewBuilder
     private var statePanel: some View {
         if model.isBusy {
             ProgressView("Preparing encrypted storage…")
-                .controlSize(.small)
         } else {
             switch model.vaultState {
             case .notCreated:
-                if model.isPortableDocument {
-                    SecureField("Create a password (at least 15 characters)", text: $model.passwordInput)
-                        .textFieldStyle(.roundedBorder).frame(maxWidth: 320)
+                VStack(alignment: .leading, spacing: 12) {
+                    SecureField("Password (at least 15 characters)", text: $model.passwordInput)
                         .accessibilityIdentifier("new-vault-password")
                     SecureField("Confirm password", text: $model.passwordConfirmation)
-                        .textFieldStyle(.roundedBorder).frame(maxWidth: 320)
                         .accessibilityIdentifier("confirm-vault-password")
-                    Text("Use at least 15 characters. Spaces and symbols are allowed; avoid reusing another password.")
+                        .onSubmit { if model.canCreatePassword { model.createVault() } }
+                    Text("Use a long, unique phrase. Spaces and symbols are allowed.")
                         .font(.caption).foregroundStyle(.secondary)
-                    Button("Create Calendar Vault", systemImage: "lock.shield") { model.createVault() }
-                        .controlSize(.large).buttonStyle(.borderedProminent)
-                        .disabled(!model.canCreatePassword)
-                        .accessibilityIdentifier("create-vault")
-                } else {
-                    Button("Create Private Vault", systemImage: "lock.shield") { model.createVault() }
-                        .controlSize(.large).buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("create-vault")
-                    Text("The key is generated on this Mac. No account required.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+                    Button("Create Vault", systemImage: "lock.shield") { model.createVault() }
+                        .buttonStyle(.borderedProminent).controlSize(.large)
+                        .disabled(!model.canCreatePassword).accessibilityIdentifier("create-vault")
+                }.textFieldStyle(.roundedBorder).frame(maxWidth: 400)
             case .locked:
-                if model.requiresPassword {
+                VStack(alignment: .leading, spacing: 12) {
                     SecureField("Vault password", text: $model.passwordInput)
-                        .textFieldStyle(.roundedBorder).frame(maxWidth: 320)
-                        .accessibilityIdentifier("vault-password")
+                        .textFieldStyle(.roundedBorder).accessibilityIdentifier("vault-password")
+                        .onSubmit { if !model.passwordInput.isEmpty { model.unlock(password: model.passwordInput) } }
                     Button("Unlock Vault", systemImage: "lock.open") { model.unlock(password: model.passwordInput) }
-                        .controlSize(.large).buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("unlock-vault")
-                    Text("Retrieve your saved password from Passwords with Touch ID or your Mac password, then paste it here.")
+                        .buttonStyle(.borderedProminent).controlSize(.large)
+                        .disabled(model.passwordInput.isEmpty).accessibilityIdentifier("unlock-vault")
+                    Text("You can paste a password saved in your password manager.")
                         .font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Button("Retry Unlock", systemImage: "touchid") { model.unlock() }
-                        .controlSize(.large).buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("unlock-vault")
-                    Text("Touch ID or your Mac password unlocks the local key.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            case .unlocked:
-                Label("Private vault unlocked", systemImage: "lock.open.fill")
-                    .font(.headline)
-                    .foregroundStyle(appAccentColor)
-                Text("Calendar data is available for this session.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Lock Now", systemImage: "lock") {
-                    model.lock()
-                }
-                .accessibilityIdentifier("lock-vault")
+                }.frame(maxWidth: 400)
             case .unlocking:
-                ProgressView("Waiting for macOS authentication…")
-                    .controlSize(.small)
-            case .recoveryRequired:
-                Label("Key recovery required", systemImage: "exclamationmark.lock")
-                    .font(.headline)
-                Text("Choose an encrypted backup and its matching recovery kit.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                Button("Restore Backup…", systemImage: "externaldrive.badge.timemachine") {
-                    chooseAndRestoreBackup()
-                }
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
+                ProgressView("Decrypting vault…")
             case .corrupt:
-                Label("The vault cannot be opened", systemImage: "exclamationmark.triangle")
-                    .font(.headline)
-                Text("Your data will be preserved without being overwritten.")
-                    .font(.caption)
+                Label("This file cannot be opened", systemImage: "exclamationmark.triangle").font(.headline)
+                Text("Choose a file created with the current version of Kansolendar.")
                     .foregroundStyle(.secondary)
-            case nil:
-                Label("Local vault unavailable", systemImage: "externaldrive.badge.exclamationmark")
-                    .font(.headline)
+                Button("Open Another Vault…", action: openKansoFile).controlSize(.large)
+            case .unlocked, nil:
+                EmptyView()
             }
         }
     }
 
-    private func chooseAndRestoreBackup() {
-        guard let backup = ExportPanel.chooseBackupForRestore(),
-              let kit = ExportPanel.chooseRecoveryKitForRestore() else { return }
-        Task { await model.restoreBackup(at: backup, recoveryKitURL: kit) }
-    }
-
     private func createKansoFile() {
-        guard let url = ExportPanel.chooseKansoDestination() else { return }
+        guard let url = VaultFilePanel.chooseKansoDestination() else { return }
         openWindow(id: "kanso-vault", value: url)
     }
 
     private func openKansoFile() {
-        guard let url = ExportPanel.chooseKansoToOpen() else { return }
+        guard let url = VaultFilePanel.chooseKansoToOpen() else { return }
         openWindow(id: "kanso-vault", value: url)
     }
+}
+
+/// The same concealed-password component is used after each new document creation.
+struct VaultPasswordView: View {
+    @Bindable var model: VaultViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Label("Your vault is ready", systemImage: "checkmark.shield").font(.title2.weight(.semibold))
+            Text("Keep this password somewhere safe. You can save it manually in Apple Passwords.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Group {
+                    if model.isPasswordRevealed, let password = model.passwordToSave {
+                        ScrollView(.horizontal) {
+                            Text(password).textSelection(.enabled)
+                                .fixedSize()
+                        }
+                        .frame(height: 32)
+                    } else {
+                        Text("••••••••••••••••")
+                            .accessibilityLabel("Password hidden")
+                    }
+                }
+                .font(.system(.body, design: .monospaced))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button(model.isPasswordRevealed ? "Hide" : "Reveal", systemImage: model.isPasswordRevealed ? "eye.slash" : "eye") {
+                    model.isPasswordRevealed.toggle()
+                }
+            }
+            .padding(14).background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+            HStack {
+                Button("Copy Password", systemImage: "doc.on.doc") {
+                    if let password = model.passwordToSave {
+                        VaultPasswordClipboard.copy(password)
+                    }
+                }.buttonStyle(.bordered)
+                Button("Open Passwords") { model.openPasswords() }.buttonStyle(.bordered)
+                Spacer()
+                Button("Continue") { model.finishPasswordPresentation() }
+                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+            }
+            Text("If you forget the password, you lose access to this vault.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .padding(28).frame(width: 520)
+    }
+
 }

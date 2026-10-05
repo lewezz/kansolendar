@@ -36,39 +36,7 @@ internal enum PrivateFileWriter {
     }
 }
 
-internal enum PrivateFileCopier {
-    static func copyNewFile(
-        from sourcePath: String,
-        to destinationPath: String,
-        maximumBytes: Int = 1_073_741_824 // Backup staging is capped at 1 GiB.
-    ) throws {
-        let source = try PrivateFileDescriptor.openSource(
-            sourcePath, maximumBytes: maximumBytes, allowEmpty: false
-        )
-        defer { close(source.descriptor) }
-        try PrivateFileDescriptor.withNewFile(at: destinationPath) { destination in
-            var buffer = [UInt8](repeating: 0, count: PrivateFileDescriptor.bufferByteCount)
-            var copiedBytes = 0
-            while true {
-                let count = buffer.withUnsafeMutableBytes {
-                    Darwin.read(source.descriptor, $0.baseAddress, $0.count)
-                }
-                if count < 0, errno == EINTR { continue }
-                guard count >= 0 else { throw PrivateFileError.filesystemFailure(errno) }
-                if count == 0 { break }
-                guard count <= maximumBytes - copiedBytes else { throw PrivateFileError.invalidSource }
-                copiedBytes += count
-                try buffer.withUnsafeBytes { bytes in
-                    try PrivateFileDescriptor.writeAll(
-                        UnsafeRawBufferPointer(start: bytes.baseAddress, count: count), to: destination
-                    )
-                }
-            }
-        }
-    }
-}
-
-/// Shared descriptor rules keep imports, backups, and recovery kits consistent.
+/// Descriptor rules reject unsafe vault files before reading or writing content.
 /// Callers own successful source descriptors; new destination descriptors stay scoped here.
 private enum PrivateFileDescriptor {
     static let bufferByteCount = 64 * 1_024

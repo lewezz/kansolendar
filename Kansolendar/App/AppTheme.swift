@@ -114,11 +114,28 @@ extension View {
 }
 
 struct AppearanceSettingsView: View {
+    @AppStorage(VaultLockSettings.storageKey) private var idleMinutes = 5
+    @AppStorage(VaultRecentFiles.enabledKey) private var rememberRecentFiles = false
     @AppStorage(AppAppearance.storageKey) private var appearance = AppAppearance.system.rawValue
     @AppStorage(AppAccent.storageKey) private var accent = AppAccent.cyan.rawValue
 
     var body: some View {
         Form {
+            Section("Privacy") {
+                Toggle("Remember recent vault files", isOn: $rememberRecentFiles)
+                    .onChange(of: rememberRecentFiles) { _, enabled in
+                        if !enabled { VaultRecentFiles.clear() }
+                    }
+                Text("Recent files store their names and locations outside the encrypted vault.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Picker("Lock after inactivity", selection: $idleMinutes) {
+                    ForEach(VaultLockSettings.choices, id: \.self) { minutes in
+                        Text("\(minutes) \(minutes == 1 ? "minute" : "minutes")").tag(minutes)
+                    }
+                }
+                Text("Vaults also lock when the Mac locks or sleeps. Switching apps does not lock them.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Appearance") {
                 Picker("Mode", selection: $appearance) {
                     ForEach(AppAppearance.allCases) { option in
@@ -159,7 +176,7 @@ struct AppearanceSettingsView: View {
         }
         .formStyle(.grouped)
         .padding(8)
-        .frame(width: 470, height: 230)
+        .frame(width: 470, height: 440)
         .navigationTitle("Settings")
     }
 }

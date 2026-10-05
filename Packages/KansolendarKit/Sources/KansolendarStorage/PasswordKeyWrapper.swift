@@ -11,6 +11,10 @@ internal struct PasswordWrappedKeyRecord: Codable, Sendable {
     let sealedKey: Data
 }
 
+internal enum PasswordKeyWrappingError: Error, Equatable, Sendable {
+    case invalidKeyMaterial, randomGenerationFailed
+}
+
 internal enum PasswordKeyWrapper {
     // These sizes and the AAD domain are part of the v1 on-disk contract.
     private static let keyByteCount = 32
@@ -24,7 +28,7 @@ internal enum PasswordKeyWrapper {
             using: wrappingKey,
             authenticating: context(vaultID: vaultID, keyID: keyID)
         )
-        guard let combined = sealed.combined else { throw VaultKeyStoreError.invalidKeyMaterial }
+        guard let combined = sealed.combined else { throw PasswordKeyWrappingError.invalidKeyMaterial }
         return PasswordWrappedKeyRecord(formatVersion: 1, iterations: VaultPassword.iterations, salt: salt, sealedKey: combined)
     }
 
@@ -32,7 +36,7 @@ internal enum PasswordKeyWrapper {
         // Validate before running PBKDF so malformed files cannot request arbitrary KDF work.
         guard record.formatVersion == 1, record.iterations == VaultPassword.iterations,
               record.salt.count == VaultPassword.saltLength, record.sealedKey.count == sealedKeyByteCount else {
-            throw VaultKeyStoreError.invalidKeyMaterial
+            throw PasswordKeyWrappingError.invalidKeyMaterial
         }
         let wrappingKey = try derive(password: password, salt: record.salt)
         let box = try AES.GCM.SealedBox(combined: record.sealedKey)
@@ -40,13 +44,13 @@ internal enum PasswordKeyWrapper {
             box, using: wrappingKey,
             authenticating: context(vaultID: vaultID, keyID: keyID)
         )
-        guard bytes.count == keyByteCount else { throw VaultKeyStoreError.invalidKeyMaterial }
+        guard bytes.count == keyByteCount else { throw PasswordKeyWrappingError.invalidKeyMaterial }
         return SymmetricKey(data: bytes)
     }
 
     private static func derive(password: String, salt: Data) throws -> SymmetricKey {
         guard VaultPassword.isAcceptable(password), salt.count == VaultPassword.saltLength else {
-            throw VaultKeyStoreError.invalidKeyMaterial
+            throw PasswordKeyWrappingError.invalidKeyMaterial
         }
         var output = [UInt8](repeating: 0, count: keyByteCount)
         let status = password.withCString { passwordPtr in
@@ -62,14 +66,14 @@ internal enum PasswordKeyWrapper {
                 )
             }
         }
-        guard status == kCCSuccess else { throw VaultKeyStoreError.invalidKeyMaterial }
+        guard status == kCCSuccess else { throw PasswordKeyWrappingError.invalidKeyMaterial }
         return SymmetricKey(data: output)
     }
 
     private static func randomBytes(count: Int) throws -> Data {
         var bytes = [UInt8](repeating: 0, count: count)
         guard SecRandomCopyBytes(kSecRandomDefault, count, &bytes) == errSecSuccess else {
-            throw VaultKeyStoreError.keychainFailure(-1)
+            throw PasswordKeyWrappingError.randomGenerationFailed
         }
         return Data(bytes)
     }

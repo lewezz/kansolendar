@@ -6,7 +6,6 @@ import Observation
 
 enum VaultPasswordSheet: String, Identifiable {
     case save
-    case restore
 
     var id: String { rawValue }
 }
@@ -30,32 +29,28 @@ final class VaultViewModel {
     var passwordConfirmation = ""
     var passwordToSave: String?
     var passwordSheet: VaultPasswordSheet?
-    private var pendingRestore: (backupURL: URL, recoveryKitURL: URL)?
+    var isPasswordRevealed = false
     @ObservationIgnored private var sessionOperationID = UUID()
     @ObservationIgnored private var contentLoadID = UUID()
+    @ObservationIgnored private var lifecycle: VaultLifecycle?
     var canCreatePassword: Bool {
         VaultPassword.isAcceptable(passwordInput) && passwordInput == passwordConfirmation
     }
     private(set) var calendars: [LocalCalendar] = []
     private(set) var events: [VaultEvent] = []
     private(set) var isLoadingContent = false
-    private(set) var isExporting = false
     var message: String?
-    private var hasAttemptedAutomaticUnlock = false
 
     // MARK: - Document lifecycle and authentication
 
     init(portableFileURL: URL? = nil) {
         self.portableFileURL = portableFileURL
-        if portableFileURL == nil {
-            do {
-                vault = try KansolendarVault()
-            } catch {
-                vault = nil
-                message = "Local storage could not be prepared. No personal information was saved."
-            }
-        }
         // Portable files are opened in start(), after acquiring security-scoped access.
+    }
+
+    func attach(to window: NSWindow) {
+        if lifecycle == nil { lifecycle = VaultLifecycle(model: self) }
+        lifecycle?.attach(to: window)
     }
 
     func start() async {
@@ -66,8 +61,12 @@ final class VaultViewModel {
             if vault == nil, FileManager.default.fileExists(atPath: portableFileURL.path) {
                 do {
                     vault = try KansolendarVault(portableFileURL: portableFileURL)
+                } catch let error as VaultError {
+                    message = error.userMessage
+                    vaultState = .corrupt
+                    return
                 } catch {
-                    message = "This .kanso file is invalid or could not be opened. Its contents were not changed."
+                    message = "This .kanso file could not be opened. Its contents were not changed."
                     vaultState = .corrupt
                     return
                 }
@@ -78,10 +77,7 @@ final class VaultViewModel {
             return
         }
         await refresh()
-        guard !requiresPassword else { return }
-        guard vaultState == .locked, !hasAttemptedAutomaticUnlock else { return }
-        hasAttemptedAutomaticUnlock = true
-        unlock()
+
     }
 
     func refresh() async {
@@ -128,18 +124,21 @@ final class VaultViewModel {
                     guard validPassword else { throw VaultError.invalidInput }
                     _ = try await targetVault.createPasswordVault(password: password)
                 } else {
-                    _ = try await targetVault.createVault()
+                    throw VaultError.invalidInput
                 }
                 let state = try await targetVault.state()
                 // Closing or locking while creation suspends must not restore password presentation.
                 guard sessionOperationID == operationID else { return }
                 if requiresPassword {
                     passwordToSave = password
+                    isPasswordRevealed = false
                     passwordSheet = .save
                     passwordInput = ""
                     passwordConfirmation = ""
                 }
                 vaultState = state
+                lifecycle?.recordActivity()
+                if let portableFileURL { VaultRecentFiles.remember(portableFileURL) }
                 await loadContent()
             } catch let error as VaultError {
                 guard sessionOperationID == operationID else { return }
@@ -162,12 +161,13 @@ final class VaultViewModel {
         Task {
             defer { if sessionOperationID == operationID { isBusy = false } }
             do {
-                if requiresPassword { try await vault.unlock(password: password) }
-                else { try await vault.unlock() }
+                try await vault.unlock(password: password)
                 let state = try await vault.state()
                 guard sessionOperationID == operationID else { return }
                 passwordInput = ""
                 vaultState = state
+                lifecycle?.recordActivity()
+                if let portableFileURL { VaultRecentFiles.remember(portableFileURL) }
                 await loadContent()
             } catch let error as VaultError {
                 guard sessionOperationID == operationID else { return }
@@ -193,6 +193,7 @@ final class VaultViewModel {
     }
 
     func finishPasswordPresentation() {
+        isPasswordRevealed = false
         passwordSheet = nil
         passwordToSave = nil
         passwordInput = ""
@@ -200,16 +201,16 @@ final class VaultViewModel {
     }
 
     func closeDocument() {
-        guard isPortableDocument else { return }
+        lifecycle?.stop()
+        lifecycle = nil
         let activeVault = vault
         let scopedAccess = hasDocumentAccess
         vault = nil
         hasDocumentAccess = false
-        vaultState = .locked
+        vaultState = isPortableDocument ? .locked : nil
         invalidateSessionPresentation()
-        pendingRestore = nil
         Task {
-            await activeVault?.lock()
+            await activeVault?.close()
             // Release the captured access claim, not one acquired by a later start().
             if scopedAccess, let portableFileURL {
                 portableFileURL.stopAccessingSecurityScopedResource()
@@ -218,11 +219,20 @@ final class VaultViewModel {
     }
 
     func lock() {
-        guard let vault else { return }
         invalidateSessionPresentation()
-        vaultState = .locked
+        guard let vault else { return }
+        // Preserve the creation gate, but still queue a storage lock behind any
+        // creation already executing so its key cannot outlive this lock event.
+        if vaultState != .notCreated { vaultState = .locked }
+        isBusy = true
+        let operationID = sessionOperationID
         Task {
             await vault.lock()
+            let state = try? await vault.state()
+            if sessionOperationID == operationID {
+                if let state { vaultState = state }
+                isBusy = false
+            }
         }
     }
 
@@ -313,7 +323,8 @@ final class VaultViewModel {
                     time: eventTime
                 )
             }
-            try await vault.save(event)
+            let original = events.first { $0.event.id == event.id }
+            try await vault.save(event, recurrence: original?.recurrence, cancellations: original?.cancellations ?? [])
             await loadContent()
             return true
         } catch let error as VaultError {
@@ -377,170 +388,12 @@ final class VaultViewModel {
         return false
     }
 
-    // MARK: - Backups, recovery, and interchange
-
-    func createBackup(at url: URL) async {
-        guard let vault else { return }
-        isExporting = true
-        defer { isExporting = false }
-        let scopedAccess = url.startAccessingSecurityScopedResource()
-        defer { if scopedAccess { url.stopAccessingSecurityScopedResource() } }
-        do {
-            try await vault.createBackup(at: url)
-            message = "Encrypted backup saved. Keep the recovery kit separately."
-        } catch let error as VaultError {
-            message = error == .conflict
-                ? "That file already exists. Choose a new name to preserve the previous backup."
-                : error.userMessage
-        } catch {
-            message = "The encrypted backup could not be created."
-        }
-    }
-
-    func exportRecoveryKit(at url: URL) async {
-        guard let vault else { return }
-        isExporting = true
-        defer { isExporting = false }
-        let scopedAccess = url.startAccessingSecurityScopedResource()
-        defer { if scopedAccess { url.stopAccessingSecurityScopedResource() } }
-        do {
-            try await vault.exportRecoveryKit(at: url)
-            message = "Recovery kit saved. Do not store it with the backup."
-        } catch let error as VaultError {
-            message = error == .conflict
-                ? "That file already exists. Choose a new name instead of overwriting it."
-                : error.userMessage
-        } catch {
-            message = "The recovery kit could not be exported."
-        }
-    }
-
-    func prepareRestoreBackup(at backupURL: URL, recoveryKitURL: URL) {
-        pendingRestore = (backupURL, recoveryKitURL)
-        passwordInput = ""
-        passwordConfirmation = ""
-        passwordSheet = .restore
-    }
-
-    func restoreBackup(at backupURL: URL, recoveryKitURL: URL) async {
-        if requiresPassword {
-            prepareRestoreBackup(at: backupURL, recoveryKitURL: recoveryKitURL)
-            return
-        }
-        guard let vault else { return }
-        isExporting = true
-        defer { isExporting = false }
-        let backupAccess = backupURL.startAccessingSecurityScopedResource()
-        let kitAccess = recoveryKitURL.startAccessingSecurityScopedResource()
-        defer {
-            if backupAccess { backupURL.stopAccessingSecurityScopedResource() }
-            if kitAccess { recoveryKitURL.stopAccessingSecurityScopedResource() }
-        }
-        do {
-            try await vault.restoreBackup(at: backupURL, recoveryKitURL: recoveryKitURL)
-            vaultState = try await vault.state()
-            await loadContent()
-            message = "Encrypted backup restored and verified."
-        } catch let error as VaultError {
-            if error == .restoreRecoveryRequired {
-                vaultState = .corrupt
-            } else {
-                vaultState = (try? await vault.state()) ?? .corrupt
-            }
-            if vaultState != .unlocked { clearPrivateContent() }
-            message = error == .corruptVault
-                ? "The backup or recovery kit is invalid or does not match. Your current vault was preserved."
-                : error.userMessage
-        } catch {
-            vaultState = (try? await vault.state()) ?? .corrupt
-            if vaultState != .unlocked { clearPrivateContent() }
-            message = "The backup could not be restored. Keep your backup and recovery kit."
-        }
-    }
-
-    func restorePendingBackup() {
-        guard let selection = pendingRestore,
-              canCreatePassword, !isExporting, let vault else { return }
-        let backupURL = selection.backupURL
-        let recoveryKitURL = selection.recoveryKitURL
-        let password = passwordInput
-        let operationID = sessionOperationID
-        isExporting = true
-        Task {
-            defer { if sessionOperationID == operationID { isExporting = false } }
-            let backupAccess = backupURL.startAccessingSecurityScopedResource()
-            let kitAccess = recoveryKitURL.startAccessingSecurityScopedResource()
-            defer {
-                if backupAccess { backupURL.stopAccessingSecurityScopedResource() }
-                if kitAccess { recoveryKitURL.stopAccessingSecurityScopedResource() }
-            }
-            do {
-                try await vault.restoreBackup(at: backupURL, recoveryKitURL: recoveryKitURL, password: password)
-                let state = try await vault.state()
-                guard sessionOperationID == operationID else { return }
-                vaultState = state
-                await loadContent()
-                guard sessionOperationID == operationID, vaultState == .unlocked else { return }
-                passwordToSave = password
-                passwordInput = ""
-                passwordConfirmation = ""
-                pendingRestore = nil
-                passwordSheet = .save
-                message = "Encrypted backup restored and verified. Save the new vault password."
-            } catch let error as VaultError {
-                guard sessionOperationID == operationID else { return }
-                message = error.userMessage
-                await refresh()
-            } catch {
-                guard sessionOperationID == operationID else { return }
-                message = "The backup could not be restored. Keep your backup and recovery kit."
-                await refresh()
-            }
-        }
-    }
-
-    func exportCalendar(id: UUID, to url: URL) async {
-        guard let vault else { return }
-        isExporting = true
-        defer { isExporting = false }
-        let access = url.startAccessingSecurityScopedResource()
-        defer { if access { url.stopAccessingSecurityScopedResource() } }
-        do {
-            try await vault.exportCalendar(id: id, to: url)
-            message = "Calendar exported as an unencrypted iCalendar file."
-        } catch let error as VaultError {
-            message = error == .conflict ? "That file already exists. Choose a new name." : error.userMessage
-        } catch {
-            message = "The calendar could not be exported."
-        }
-    }
-
-    func importCalendarEvents(from url: URL, into calendarID: UUID) async {
-        guard let vault else { return }
-        isExporting = true
-        defer { isExporting = false }
-        let access = url.startAccessingSecurityScopedResource()
-        defer { if access { url.stopAccessingSecurityScopedResource() } }
-        do {
-            let count = try await vault.importCalendarEvents(from: url, into: calendarID)
-            await loadContent()
-            message = "Imported \(count) \(count == 1 ? "event" : "events") safely."
-        } catch let error as VaultError {
-            message = error == .duplicateUID
-                ? "Import cancelled because an event UID already exists. No events were added."
-                : "This iCalendar file contains invalid or unsupported data. No events were added."
-        } catch {
-            message = "The calendar could not be imported. No events were added."
-        }
-    }
-
     // MARK: - Private presentation helpers
 
     private func invalidateSessionPresentation() {
         // Storage has its own key-generation checks; this token guards only suspended UI work.
         sessionOperationID = UUID()
         isBusy = false
-        isExporting = false
         finishPasswordPresentation()
         clearPrivateContent()
     }
@@ -555,10 +408,10 @@ final class VaultViewModel {
 
     private func handleContentError(_ error: VaultError) {
         message = error.userMessage
-        if error == .locked || error == .authenticationCancelled || error == .authenticationFailed {
+        if error == .locked || error == .authenticationFailed || error == .fileChanged || error == .storageUnavailable {
             invalidateSessionPresentation()
             vaultState = .locked
-        } else if error == .corruptVault || error == .restoreRecoveryRequired {
+        } else if error == .corruptVault {
             invalidateSessionPresentation()
             vaultState = .corrupt
         }

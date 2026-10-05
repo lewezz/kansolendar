@@ -10,7 +10,7 @@
 			<key>UTTypeDescription</key>
 			<string>Kansolendar Encrypted Calendar Vault</string>
 			<key>UTTypeConformsTo</key>
-			<array><string>public.database</string></array>
+			<array><string>public.data</string></array>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

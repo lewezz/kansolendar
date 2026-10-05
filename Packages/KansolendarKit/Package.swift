@@ -19,16 +19,12 @@ let package = Package(
     ],
     dependencies: [],
     targets: [
-        .systemLibrary(
-            name: "CSQLite",
-            path: "Sources/CSQLite"
-        ),
         .target(
             name: "KansolendarCore"
         ),
         .target(
             name: "KansolendarStorage",
-            dependencies: ["KansolendarCore", "CSQLite"]
+            dependencies: ["KansolendarCore"]
         ),
         .testTarget(
             name: "KansolendarCoreTests",
@@ -36,7 +32,7 @@ let package = Package(
         ),
         .testTarget(
             name: "KansolendarStorageTests",
-            dependencies: ["KansolendarStorage", "CSQLite"]
+            dependencies: ["KansolendarStorage"]
         )
     ]
 )
