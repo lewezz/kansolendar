@@ -31,24 +31,50 @@ you need another copy; the app does not manage extra archive formats.
 - Calendars, colors, all-day/timed events, notes and locations.
 - A clear create/open screen with optional recent-file history.
 - Passwords concealed by default, with explicit reveal and copy controls.
-- Readable text-and-icon toolbar actions and local appearance/privacy preferences.
+- Readable text-and-icon toolbar actions and local appearance/privacy preferences, including ten shared font choices: System, Serif, Rounded, Monospaced, Helvetica Neue, Arial, Avenir, Georgia, Times New Roman and Verdana.
 
 ## Installation from GitHub
 
-When a release is published, download its Kansolendar app archive, extract it,
-and move `Kansolendar.app` into Applications. The app uses local ad hoc signing,
-without a development provisioning profile or certificate expiry timer. It is
-not notarized or identified by Apple through Developer ID.
+Requires an **Apple Silicon Mac (M1 or later) with macOS 14 or later**. This build
+supports arm64; it does not run on Intel Macs.
 
-On first opening, macOS may refuse to launch it. For a download you trust, follow
-Apple's per-app process: attempt to open it, then go to **System Settings → Privacy
-& Security → Open Anyway** and confirm. Do not disable Gatekeeper globally.
-Managed Macs may prohibit this exception. A future macOS version may change
-compatibility; absence of a signing expiry is not a permanent compatibility promise.
-See [Apple's instructions](https://support.apple.com/en-us/102445).
+1. Open this repository's **Releases** page and download the
+   `Kansolendar-<version>-macOS-arm64.zip` asset. Do not download the source-code ZIP.
+2. Double-click the ZIP to extract **Kansolendar.app**.
+3. Drag **Kansolendar.app** into your **Applications** folder.
+4. Open Kansolendar from Applications.
 
-No GitHub release has been published by this implementation. The artifact still
-needs fresh-Mac, quarantined-download and real file-panel integration verification.
+### First opening: allow this app in macOS
+
+macOS may block the first launch with a message that the developer cannot be
+verified or Apple cannot check the app for malicious software. Kansolendar uses
+**ad hoc signing**: it is not signed with an Apple Developer ID certificate and
+has not been notarized by Apple. Gatekeeper therefore cannot establish Apple's
+usual developer/notarization trust for this download.
+
+If you trust this repository and downloaded its release asset:
+
+1. Attempt to open **Kansolendar.app** from Applications. Dismiss the warning
+   without moving the app to the Trash.
+2. Open **System Settings → Privacy & Security** and scroll to the **Security** section.
+3. Find the message about Kansolendar and click **Open Anyway**.
+4. Authenticate if macOS asks, then confirm **Open** in the next dialog.
+
+macOS records an exception for this app. You can then open it normally from
+Applications; a new version may require approval again. See
+[Apple's first-opening instructions](https://support.apple.com/en-us/102445).
+
+Do not disable Gatekeeper globally. If **Open Anyway** is unavailable on a
+managed Mac, contact its administrator. A warning that the app is damaged or
+will harm your computer is a different condition: do not bypass it; download
+again from the repository's release and report the issue if it persists.
+
+### Does the app expire?
+
+This build has **no signing expiration date**: it uses no Apple signing
+certificate or temporary development provisioning profile. It does not require
+periodic renewal or an Apple Developer subscription. Future macOS compatibility
+and security-policy changes remain separate from signing expiration.
 
 ## Development
 
