@@ -5,34 +5,6 @@
 A private, offline calendar for Apple Silicon Macs running macOS 14 or later.
 No accounts, servers, app-managed synchronization, analytics, or telemetry.
 
-## Calendar vaults
-
-Create or open a user-named `.kanso` file, then unlock it with its own password.
-Each file contains independent calendars and events. New-format files encrypt
-all calendar content, IDs, relationships and internal inventory with AES-256-GCM.
-The filename, file size, dates and cryptographic header remain visible.
-
-Use a unique password of at least 15 characters. There is no Touch ID unlock,
-password reset. You may save the password manually in Apple
-Passwords; Kansolendar does not save credentials there automatically.
-
-Vaults lock when closed, when the Mac locks or sleeps, and after inactivity.
-The default is 5 minutes; choices are 1, 2, 3, 4, 5, 10, 15 and 30 minutes.
-Switching applications does not immediately lock them. Recent-file history is
-optional and disabled by default. Multiple files have independent windows/sessions.
-
-Only the current whole-document `.kanso` format is supported. Older formats are
-rejected without changing the selected file. Copy a closed `.kanso` yourself when
-you need another copy; the app does not manage extra archive formats.
-
-## Features
-
-- Day, week, month and year views; calendar filtering and title search.
-- Calendars, colors, all-day/timed events, notes and locations.
-- A clear create/open screen with optional recent-file history.
-- Passwords concealed by default, with explicit reveal and copy controls.
-- Readable text-and-icon toolbar actions and local appearance/privacy preferences, including ten shared font choices: System, Serif, Rounded, Monospaced, Helvetica Neue, Arial, Avenir, Georgia, Times New Roman and Verdana.
-
 ## Installation from GitHub
 
 Requires an **Apple Silicon Mac (M1 or later) with macOS 14 or later**. This build
@@ -68,6 +40,34 @@ Do not disable Gatekeeper globally. If **Open Anyway** is unavailable on a
 managed Mac, contact its administrator. A warning that the app is damaged or
 will harm your computer is a different condition: do not bypass it; download
 again from the repository's release and report the issue if it persists.
+
+## Calendar vaults
+
+Create or open a user-named `.kanso` file, then unlock it with its own password.
+Each file contains independent calendars and events. New-format files encrypt
+all calendar content, IDs, relationships and internal inventory with AES-256-GCM.
+The filename, file size, dates and cryptographic header remain visible.
+
+Use a unique password of at least 15 characters. There is no Touch ID unlock,
+password reset. You may save the password manually in Apple
+Passwords; Kansolendar does not save credentials there automatically.
+
+Vaults lock when closed, when the Mac locks or sleeps, and after inactivity.
+The default is 5 minutes; choices are 1, 2, 3, 4, 5, 10, 15 and 30 minutes.
+Switching applications does not immediately lock them. Recent-file history is
+optional and disabled by default. Multiple files have independent windows/sessions.
+
+Only the current whole-document `.kanso` format is supported. Older formats are
+rejected without changing the selected file. Copy a closed `.kanso` yourself when
+you need another copy; the app does not manage extra archive formats.
+
+## Features
+
+- Day, week, month and year views; calendar filtering and title search.
+- Calendars, colors, all-day/timed events, notes and locations.
+- A clear create/open screen with optional recent-file history.
+- Passwords concealed by default, with explicit reveal and copy controls.
+- Readable text-and-icon toolbar actions and local appearance/privacy preferences, including ten shared font choices: System, Serif, Rounded, Monospaced, Helvetica Neue, Arial, Avenir, Georgia, Times New Roman and Verdana.
 
 ### Does the app expire?
 
