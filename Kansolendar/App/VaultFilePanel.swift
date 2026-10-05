@@ -9,7 +9,7 @@ enum VaultFilePanel {
         guard let selected = chooseDestination(
             title: "Create Calendar Vault",
             message: "Choose a name and location for this independent, password-protected vault file.",
-            name: "Kansolendar.kanso",
+            name: "Kansolendar",
             type: kansoType
         ) else { return nil }
         let url = selected.pathExtension.lowercased() == "kanso" ? selected : selected.appendingPathExtension("kanso")
@@ -51,8 +51,9 @@ enum VaultFilePanel {
         let panel = NSSavePanel()
         panel.title = title
         panel.message = message
-        panel.nameFieldStringValue = name
         panel.allowedContentTypes = [type]
+        // AppKit manages the extension; provide only the base name after the type.
+        panel.nameFieldStringValue = name
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
         panel.showsTagField = false
