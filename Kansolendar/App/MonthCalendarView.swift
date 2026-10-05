@@ -36,7 +36,7 @@ struct MonthCalendarView: View {
                     Image(systemName: "info.circle")
                         .foregroundStyle(appAccentColor)
                 }
-                    .font(.callout)
+                    .appTextFont(.callout)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 9)
@@ -64,7 +64,7 @@ struct MonthCalendarView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(monthName.uppercased())
-                    .font(.system(.title, design: .monospaced, weight: .semibold))
+                    .appTextFont(.title, weight: .semibold)
                     .tracking(1.4)
             }
 
@@ -86,7 +86,7 @@ struct MonthCalendarView: View {
         LazyVGrid(columns: columns, spacing: 0) {
             ForEach(Self.weekdaySymbols, id: \.self) { symbol in
                 Text(symbol.uppercased())
-                    .font(.caption2.monospaced().weight(.semibold))
+                    .appTextFont(.caption2, weight: .semibold)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
@@ -107,14 +107,14 @@ struct MonthCalendarView: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
                     Text(day.date.day.formatted())
-                        .font(.system(.callout, design: .monospaced, weight: isToday ? .bold : .medium))
+                        .appTextFont(.callout, weight: isToday ? .bold : .medium)
                         .foregroundStyle(isToday ? Color.white : (day.isInDisplayedMonth ? Color.primary : Color.secondary.opacity(0.55)))
                         .frame(width: 25, height: 25)
                         .background(isToday ? appAccentColor : .clear, in: Circle())
                     Spacer()
                     if !dayEvents.isEmpty {
                         Text("\(dayEvents.count)")
-                            .font(.caption2.monospaced())
+                            .appTextFont(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -127,7 +127,7 @@ struct MonthCalendarView: View {
                 }
                 if dayEvents.count > 3 {
                     Text("+\(dayEvents.count - 3) more")
-                        .font(.caption2)
+                        .appTextFont(.caption2)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
@@ -166,10 +166,10 @@ struct MonthCalendarView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("AGENDA / \(shortDate(selectedDate).uppercased())")
-                        .font(.caption.monospaced().weight(.semibold))
+                        .appTextFont(.caption, weight: .semibold)
                         .foregroundStyle(appAccentColor)
                     Text(longDate(selectedDate))
-                        .font(.title3.weight(.semibold))
+                        .appTextFont(.title3, weight: .semibold)
                 }
                 Spacer()
                 Button("New Event", systemImage: "plus") { onCreateEvent(selectedDate) }
@@ -273,12 +273,12 @@ private struct EventChip: View {
                 .fill(calendar?.color.swiftUIColor ?? appAccentColor)
                 .frame(width: 3)
             Text(placement.timeDescription.uppercased())
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .appTextFont(size: 9, weight: .bold)
                 .foregroundStyle(calendar?.color.swiftUIColor ?? appAccentColor)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
             Text(placement.master.title)
-                .font(.caption2.weight(.medium))
+                .appTextFont(.caption2, weight: .medium)
                 .lineLimit(1)
         }
         .foregroundStyle(.primary)
@@ -303,9 +303,9 @@ private struct AgendaRow: View {
                 .fill(calendar?.color.swiftUIColor ?? appAccentColor)
                 .frame(width: 4, height: 44)
             VStack(alignment: .leading, spacing: 3) {
-                Text(placement.master.title).font(.headline)
+                Text(placement.master.title).appTextFont(.headline)
                 Text(placement.timeDescription)
-                    .font(.caption.monospaced())
+                    .appTextFont(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()

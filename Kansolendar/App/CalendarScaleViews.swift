@@ -28,7 +28,7 @@ struct CalendarModeBar: View {
                     mode = option
                 } label: {
                     Label(option.title, systemImage: option.systemImage)
-                        .font(.callout.monospaced().weight(.semibold))
+                        .appTextFont(.callout, weight: .semibold)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .frame(minWidth: 116, minHeight: 44)
@@ -166,9 +166,9 @@ struct WeekCalendarView: View {
             } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(format(date, .dateTime.weekday(.abbreviated)).uppercased())
-                        .font(.caption2.monospaced().weight(.bold))
+                        .appTextFont(.caption2, weight: .bold)
                     Text("\(date.day)")
-                        .font(.title2.monospaced().weight(.semibold))
+                        .appTextFont(.title2, weight: .semibold)
                 }
                 .foregroundStyle(isSelected ? accent : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -179,7 +179,7 @@ struct WeekCalendarView: View {
 
             if dayEvents.isEmpty {
                 Text("OPEN")
-                    .font(.caption2.monospaced())
+                    .appTextFont(.caption2)
                     .foregroundStyle(.tertiary)
                     .padding(.top, 6)
             } else {
@@ -282,7 +282,7 @@ private struct MiniMonthPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(format(calendarMonth.firstDay, .dateTime.month(.wide)).uppercased())
-                .font(.caption.monospaced().weight(.bold))
+                .appTextFont(.caption, weight: .bold)
                 .foregroundStyle(accent)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 3) {
                 ForEach(grid.days) { day in
@@ -291,7 +291,7 @@ private struct MiniMonthPanel: View {
                     } label: {
                         ZStack(alignment: .bottom) {
                             Text("\(day.date.day)")
-                                .font(.caption2.monospaced())
+                                .appTextFont(.caption2)
                                 .foregroundStyle(day.isInDisplayedMonth ? .primary : .tertiary)
                                 .frame(maxWidth: .infinity, minHeight: 22)
                                 .background(day.date == selectedDate ? accent.opacity(0.16) : .clear)
@@ -330,10 +330,10 @@ private struct TechPeriodHeader: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(eyebrow)
-                    .font(.caption2.monospaced().weight(.bold))
+                    .appTextFont(.caption2, weight: .bold)
                     .foregroundStyle(accent)
                 Text(title.uppercased())
-                    .font(.title2.monospaced().weight(.semibold))
+                    .appTextFont(.title2, weight: .semibold)
             }
             Spacer()
             Button(previousLabel, systemImage: "chevron.left", action: onPrevious).labelStyle(.iconOnly)
@@ -360,7 +360,7 @@ private struct TechEmptyState: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: systemImage).foregroundStyle(accent)
-            Text(text).font(.callout.monospaced()).foregroundStyle(.secondary)
+            Text(text).appTextFont(.callout).foregroundStyle(.secondary)
             Spacer()
         }
         .padding(18)
@@ -383,11 +383,11 @@ private struct TechEventCard: View {
                 .frame(width: 3, height: 50)
             VStack(alignment: .leading, spacing: 4) {
                 Text(placement.timeDescription.uppercased())
-                    .font(.caption2.monospaced().weight(.bold))
+                    .appTextFont(.caption2, weight: .bold)
                     .foregroundStyle(accent)
-                Text(placement.master.title).font(.headline)
+                Text(placement.master.title).appTextFont(.headline)
                 if let location = placement.master.location {
-                    Text(location).font(.caption).foregroundStyle(.secondary)
+                    Text(location).appTextFont(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer()
@@ -409,10 +409,10 @@ private struct TechWeekEvent: View {
         Button(action: onEdit) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(placement.timeDescription.uppercased())
-                    .font(.caption2.monospaced())
+                    .appTextFont(.caption2)
                     .foregroundStyle(.secondary)
                 Text(placement.master.title)
-                    .font(.caption.weight(.semibold))
+                    .appTextFont(.caption, weight: .semibold)
                     .lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

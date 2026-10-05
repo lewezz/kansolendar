@@ -54,13 +54,13 @@ struct RootView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(KansolendarBuildInfo.productName).font(.title2.weight(.semibold))
+                        Text(KansolendarBuildInfo.productName).appTextFont(.title2, weight: .semibold)
                         Text("PRIVATE CALENDARS")
-                            .font(.caption.weight(.medium)).tracking(1.5).foregroundStyle(.secondary)
+                            .appTextFont(.caption, weight: .medium).tracking(1.5).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Label("Offline", systemImage: "lock.shield")
-                        .font(.callout).foregroundStyle(.secondary)
+                        .appTextFont(.callout).foregroundStyle(.secondary)
                 }
 
                 if model.isPortableDocument {
@@ -71,7 +71,7 @@ struct RootView: View {
 
                 if let message = model.message {
                     Label(message, systemImage: "info.circle")
-                        .font(.callout).foregroundStyle(.secondary)
+                        .appTextFont(.callout).foregroundStyle(.secondary)
                         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                         .background(appAccentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
                         .accessibilityIdentifier("vault-message")
@@ -82,7 +82,7 @@ struct RootView: View {
                     Spacer()
                     Text("No accounts · No servers · No sync")
                 }
-                .font(.caption).foregroundStyle(.secondary)
+                .appTextFont(.caption).foregroundStyle(.secondary)
             }
             .padding(48).frame(maxWidth: 960)
             .frame(maxWidth: .infinity)
@@ -95,9 +95,9 @@ struct RootView: View {
         VStack(alignment: .leading, spacing: 26) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Your time, kept private.")
-                    .font(.system(size: 36, weight: .semibold))
+                    .appTextFont(size: 36, weight: .semibold)
                 Text("Keep your calendars in a password-protected .kanso file. Choose where it lives and open it whenever you need it.")
-                    .font(.body).foregroundStyle(.secondary).frame(maxWidth: 600, alignment: .leading)
+                    .appTextFont(.body).foregroundStyle(.secondary).frame(maxWidth: 600, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(alignment: .top, spacing: 18) {
@@ -107,7 +107,7 @@ struct RootView: View {
             if rememberRecentFiles {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("Recent vaults").font(.headline)
+                        Text("Recent vaults").appTextFont(.headline)
                         Spacer()
                         if !recentFiles.isEmpty {
                             Button("Clear history") { VaultRecentFiles.clear() }.buttonStyle(.link)
@@ -123,9 +123,9 @@ struct RootView: View {
                                 HStack(spacing: 12) {
                                     Image(systemName: "lock.doc").foregroundStyle(appAccentColor)
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(url.deletingPathExtension().lastPathComponent).font(.body.weight(.medium))
+                                        Text(url.deletingPathExtension().lastPathComponent).appTextFont(.body, weight: .medium)
                                         Text((url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath)
-                                            .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                                            .appTextFont(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                                     }
                                     Spacer()
                                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
@@ -143,8 +143,8 @@ struct RootView: View {
 
     private func welcomeAction(title: String, description: String, symbol: String, primary: Bool, action: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Image(systemName: symbol).font(.title2).foregroundStyle(appAccentColor).accessibilityHidden(true)
-            Text(title).font(.title3.weight(.semibold))
+            Image(systemName: symbol).appTextFont(.title2).foregroundStyle(appAccentColor).accessibilityHidden(true)
+            Text(title).appTextFont(.title3, weight: .semibold)
             Text(description).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
             if primary {
@@ -161,7 +161,7 @@ struct RootView: View {
     private var documentGate: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(model.displayName ?? "Calendar vault").font(.largeTitle.weight(.semibold))
+                Text(model.displayName ?? "Calendar vault").appTextFont(.largeTitle, weight: .semibold)
                 Text(model.vaultState == .notCreated ? "Choose a unique password for this vault." : "Unlock your calendars with this file’s password.")
                     .foregroundStyle(.secondary)
             }
@@ -185,7 +185,7 @@ struct RootView: View {
                         .accessibilityIdentifier("confirm-vault-password")
                         .onSubmit { if model.canCreatePassword { model.createVault() } }
                     Text("Use a long, unique phrase. Spaces and symbols are allowed.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .appTextFont(.caption).foregroundStyle(.secondary)
                     Button("Create Vault", systemImage: "lock.shield") { model.createVault() }
                         .buttonStyle(.borderedProminent).controlSize(.large)
                         .disabled(!model.canCreatePassword).accessibilityIdentifier("create-vault")
@@ -199,12 +199,12 @@ struct RootView: View {
                         .buttonStyle(.borderedProminent).controlSize(.large)
                         .disabled(model.passwordInput.isEmpty).accessibilityIdentifier("unlock-vault")
                     Text("You can paste a password saved in your password manager.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .appTextFont(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: 400)
             case .unlocking:
                 ProgressView("Decrypting vault…")
             case .corrupt:
-                Label("This file cannot be opened", systemImage: "exclamationmark.triangle").font(.headline)
+                Label("This file cannot be opened", systemImage: "exclamationmark.triangle").appTextFont(.headline)
                 Text("Choose a file created with the current version of Kansolendar.")
                     .foregroundStyle(.secondary)
                 Button("Open Another Vault…", action: openKansoFile).controlSize(.large)
@@ -237,7 +237,7 @@ struct VaultPasswordView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Label("Your vault is ready", systemImage: "checkmark.shield").font(.title2.weight(.semibold))
+            Label("Your vault is ready", systemImage: "checkmark.shield").appTextFont(.title2, weight: .semibold)
             Text("Keep this password somewhere safe. You can save it manually in Apple Passwords.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -254,7 +254,7 @@ struct VaultPasswordView: View {
                             .accessibilityLabel("Password hidden")
                     }
                 }
-                .font(.system(.body, design: .monospaced))
+                .appTextFont(.body)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Button(model.isPasswordRevealed ? "Hide" : "Reveal", systemImage: model.isPasswordRevealed ? "eye.slash" : "eye") {
                     model.isPasswordRevealed.toggle()
@@ -273,7 +273,7 @@ struct VaultPasswordView: View {
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             }
             Text("If you forget the password, you lose access to this vault.")
-                .font(.caption).foregroundStyle(.secondary)
+                .appTextFont(.caption).foregroundStyle(.secondary)
         }
         .padding(28).frame(width: 520)
     }

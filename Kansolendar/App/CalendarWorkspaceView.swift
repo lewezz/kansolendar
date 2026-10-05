@@ -9,6 +9,7 @@ struct CalendarWorkspaceView: View {
     @Bindable var model: VaultViewModel
     @AppStorage(AppAppearance.storageKey) private var appearance = AppAppearance.system.rawValue
     @AppStorage(AppAccent.storageKey) private var accent = AppAccent.cyan.rawValue
+    @AppStorage(AppFont.storageKey) private var font = AppFont.system.rawValue
     @State private var selectedCalendarID: UUID?
     @State private var editorEvent: Event?
     @State private var isPresentingEventEditor = false
@@ -19,8 +20,8 @@ struct CalendarWorkspaceView: View {
     @State private var selectedDate = CivilDate.localToday
     @State private var displayedMonth = CalendarMonth(containing: CivilDate.localToday)
     @State private var viewMode: CalendarViewMode = .month
-
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
     /// Explicit text avoids the native toolbar automatically reducing Labels to icons.
     private func toolbarLabel(_ title: String, symbol: String) -> some View {
         HStack(spacing: 7) {
@@ -61,7 +62,7 @@ struct CalendarWorkspaceView: View {
                     }
                 } header: {
                     Text("CALENDARS")
-                        .font(.caption2.monospaced().weight(.bold))
+                        .appTextFont(.caption2, weight: .bold)
                         .tracking(0.8)
                 }
             }
@@ -101,9 +102,8 @@ struct CalendarWorkspaceView: View {
         .frame(minWidth: AppWindowLayout.minimumWidth, minHeight: 500)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .searchable(text: $searchText, placement: .toolbar, prompt: "Search by title")
-        .toolbar {
         .toolbar(removing: .sidebarToggle)
-            ToolbarItemGroup {
+        .toolbar {
             // Keep the toggle beside the sidebar, including when it is hidden.
             ToolbarItem(placement: .navigation) {
                 Button {
@@ -115,6 +115,7 @@ struct CalendarWorkspaceView: View {
                     )
                 }
             }
+            ToolbarItemGroup {
                 Button {
                     guard let url = VaultFilePanel.chooseKansoDestination() else { return }
                     openWindow(id: "kanso-vault", value: url)
@@ -148,6 +149,12 @@ struct CalendarWorkspaceView: View {
                         ForEach(AppAccent.allCases) { option in
                             Text(option.localizedName)
                                 .tag(option.rawValue)
+                        }
+                    }
+                    Divider()
+                    Picker("Font", selection: $font) {
+                        ForEach(AppFont.allCases) { option in
+                            Text(option.localizedName).tag(option.rawValue)
                         }
                     }
                 } label: { toolbarLabel("Appearance", symbol: selectedAppearance.systemImage) }
@@ -260,7 +267,7 @@ struct CalendarWorkspaceView: View {
             .overlay(alignment: .bottom) {
                 if let message = model.message {
                     Text(message)
-                        .font(.callout.monospaced())
+                        .appTextFont(.callout)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 9)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))

@@ -47,9 +47,9 @@ struct CalendarEditorSheet: View {
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(calendarPreviewName)
-                                .font(.headline)
+                                .appTextFont(.headline)
                             Text("Sidebar preview")
-                                .font(.caption)
+                                .appTextFont(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -170,7 +170,7 @@ struct EventEditorSheet: View {
                             HStack(alignment: .top, spacing: 16) {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("START TIME")
-                                        .font(.caption.monospaced().weight(.bold))
+                                        .appTextFont(.caption, weight: .bold)
                                         .foregroundStyle(.secondary)
                                     TimeWheelPicker(selection: $start, accessibilityLabel: "Start Time")
                                 }
@@ -178,7 +178,7 @@ struct EventEditorSheet: View {
 
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("END TIME")
-                                        .font(.caption.monospaced().weight(.bold))
+                                        .appTextFont(.caption, weight: .bold)
                                         .foregroundStyle(.secondary)
                                     TimeWheelPicker(selection: $end, accessibilityLabel: "End Time")
                                 }
@@ -285,7 +285,7 @@ private struct TimeWheelPicker: View {
             TimeWheelColumn(values: Array(0..<24), selection: $hour, accent: accent)
                 .accessibilityLabel("\(accessibilityLabel) hour")
             Text(":")
-                .font(.title.monospaced().weight(.bold))
+                .appTextFont(.title, weight: .bold)
                 .foregroundStyle(accent)
             TimeWheelColumn(values: Array(0..<60), selection: $minute, accent: accent)
                 .accessibilityLabel("\(accessibilityLabel) minute")
@@ -335,7 +335,7 @@ private struct TimeWheelColumn: View {
                         withAnimation(.snappy(duration: 0.18)) { selection = value }
                     } label: {
                         Text(String(format: "%02d", value))
-                            .font(.title2.monospaced().weight(selection == value ? .bold : .regular))
+                            .appTextFont(.title2, weight: selection == value ? .bold : .regular)
                             .foregroundStyle(selection == value ? accent : .secondary)
                             .frame(width: 62, height: 34)
                             .contentShape(Rectangle())
@@ -370,7 +370,7 @@ private struct EditorSheetHeader: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: systemImage)
-                .font(.system(size: 21, weight: .semibold))
+                .appTextFont(size: 21, weight: .semibold)
                 .foregroundStyle(appAccentColor)
                 .frame(width: 42, height: 42)
                 .background(appAccentColor.opacity(0.13), in: RoundedRectangle(cornerRadius: 11))
@@ -378,10 +378,10 @@ private struct EditorSheetHeader: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.title2.monospaced().weight(.semibold))
+                    .appTextFont(.title2, weight: .semibold)
                     .tracking(0.5)
                 Text(subtitle)
-                    .font(.callout)
+                    .appTextFont(.callout)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -406,7 +406,7 @@ private struct EditorSection<Content: View>: View {
                 Image(systemName: systemImage)
                     .foregroundStyle(appAccentColor)
             }
-            .font(.caption.monospaced().weight(.bold))
+            .appTextFont(.caption, weight: .bold)
 
             VStack(alignment: .leading, spacing: 14) {
                 content
@@ -436,11 +436,11 @@ private struct EditorField<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .font(.subheadline.weight(.medium))
+                .appTextFont(.subheadline, weight: .medium)
             content
             if let hint {
                 Text(hint)
-                    .font(.caption)
+                    .appTextFont(.caption)
                     .foregroundStyle(.secondary)
             }
         }
