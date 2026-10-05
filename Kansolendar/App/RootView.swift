@@ -5,6 +5,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(\.appAccentColor) private var appAccentColor
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismiss) private var dismiss
     @AppStorage(VaultRecentFiles.enabledKey) private var rememberRecentFiles = false
     @State private var recentFiles: [URL] = []
     @State private var model: VaultViewModel
@@ -21,7 +22,11 @@ struct RootView: View {
                 vaultGate
             }
         }
-        .frame(minWidth: 1_100, minHeight: 700)
+        .frame(minWidth: AppWindowLayout.minimumWidth, minHeight: 700)
+        .navigationTitle(model.portableFileURL.map { "Kansolendar — \($0.lastPathComponent)" } ?? "Kansolendar")
+        .navigationSubtitle(model.portableFileURL.map {
+            ($0.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath
+        } ?? "")
         .background(VaultWindowAttachment(model: model).frame(width: 0, height: 0))
         .task { await model.start() }
         .onAppear { recentFiles = VaultRecentFiles.urls }
@@ -31,7 +36,7 @@ struct RootView: View {
         .onOpenURL { url in
             guard KansoOpenPanelFilter.accepts(url) else { return }
             guard model.portableFileURL?.standardizedFileURL != url.standardizedFileURL else { return }
-            openWindow(id: "kanso-vault", value: url)
+            openVaultWindow(url)
         }
         .onDisappear { model.closeDocument() }
         .sheet(item: $model.passwordSheet) { _ in
@@ -113,7 +118,7 @@ struct RootView: View {
                     } else {
                         ForEach(recentFiles, id: \.self) { url in
                             Button {
-                                openWindow(id: "kanso-vault", value: url)
+                                openVaultWindow(url)
                             } label: {
                                 HStack(spacing: 12) {
                                     Image(systemName: "lock.doc").foregroundStyle(appAccentColor)
@@ -211,12 +216,18 @@ struct RootView: View {
 
     private func createKansoFile() {
         guard let url = VaultFilePanel.chooseKansoDestination() else { return }
-        openWindow(id: "kanso-vault", value: url)
+        openVaultWindow(url)
     }
 
     private func openKansoFile() {
         guard let url = VaultFilePanel.chooseKansoToOpen() else { return }
+        openVaultWindow(url)
+    }
+
+    private func openVaultWindow(_ url: URL) {
         openWindow(id: "kanso-vault", value: url)
+        // Only replace the welcome window; existing vault sessions stay open.
+        if !model.isPortableDocument { dismiss() }
     }
 }
 

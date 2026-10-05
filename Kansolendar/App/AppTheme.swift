@@ -1,6 +1,11 @@
 import AppKit
 import SwiftUI
 
+enum AppWindowLayout {
+    // Reserve room for readable toolbar labels, sidebar navigation and search.
+    static let minimumWidth: CGFloat = 1_400
+}
+
 enum AppAppearance: String, CaseIterable, Identifiable {
     static let storageKey = "appAppearance"
 

@@ -20,6 +20,7 @@ struct CalendarWorkspaceView: View {
     @State private var displayedMonth = CalendarMonth(containing: CivilDate.localToday)
     @State private var viewMode: CalendarViewMode = .month
 
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     /// Explicit text avoids the native toolbar automatically reducing Labels to icons.
     private func toolbarLabel(_ title: String, symbol: String) -> some View {
         HStack(spacing: 7) {
@@ -40,7 +41,7 @@ struct CalendarWorkspaceView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: $selectedCalendarID) {
                 Section {
                     ForEach(model.calendars) { calendar in
@@ -97,11 +98,23 @@ struct CalendarWorkspaceView: View {
             calendarSurface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 760, minHeight: 500)
+        .frame(minWidth: AppWindowLayout.minimumWidth, minHeight: 500)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .searchable(text: $searchText, placement: .toolbar, prompt: "Search by title")
         .toolbar {
+        .toolbar(removing: .sidebarToggle)
             ToolbarItemGroup {
+            // Keep the toggle beside the sidebar, including when it is hidden.
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+                } label: {
+                    toolbarLabel(
+                        columnVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar",
+                        symbol: "sidebar.left"
+                    )
+                }
+            }
                 Button {
                     guard let url = VaultFilePanel.chooseKansoDestination() else { return }
                     openWindow(id: "kanso-vault", value: url)
