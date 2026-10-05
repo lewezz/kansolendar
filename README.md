@@ -16,10 +16,6 @@ supports arm64; it does not run on Intel Macs.
 3. Drag **Kansolendar.app** onto the **Applications** shortcut inside the image.
 4. Eject the Kansolendar disk image, then open Kansolendar from Applications.
 
-If you download the app's `.zip` asset instead (named `kansolendar-N.Nv.zip`),
-double-click it to extract **Kansolendar.app**, then drag the app into your
-Applications folder.
-
 ### First opening: allow this app in macOS
 
 macOS may block the first launch with a message that the developer cannot be
