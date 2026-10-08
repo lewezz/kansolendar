@@ -5,6 +5,8 @@
 A private, offline calendar for Apple Silicon Macs running macOS 14 or later.
 No accounts, servers, app-managed synchronization, analytics, or telemetry.
 
+**Official website:** [kansolendar.com](https://kansolendar.com).
+
 ## Installation from GitHub
 
 Requires an **Apple Silicon Mac (M1 or later) with macOS 14 or later**. This build
