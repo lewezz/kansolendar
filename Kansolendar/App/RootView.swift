@@ -55,11 +55,13 @@ struct RootView: View {
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(KansolendarBuildInfo.productName).appTextFont(.title2, weight: .semibold)
-                        Text("PRIVATE CALENDARS")
+                        Text(L10n.string("PRIVATE CALENDARS"))
                             .appTextFont(.caption, weight: .medium).tracking(1.5).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Label("Offline", systemImage: "lock.shield")
+                    AppLanguagePicker()
+                        .fixedSize()
+                    Label(L10n.string("Offline"), systemImage: "lock.shield")
                         .appTextFont(.callout).foregroundStyle(.secondary)
                 }
 
@@ -70,7 +72,7 @@ struct RootView: View {
                 }
 
                 if let message = model.message {
-                    Label(message, systemImage: "info.circle")
+                    Label(L10n.string(message), systemImage: "info.circle")
                         .appTextFont(.callout).foregroundStyle(.secondary)
                         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                         .background(appAccentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
@@ -78,9 +80,9 @@ struct RootView: View {
                 }
                 Divider()
                 HStack {
-                    Label("Encrypted files. Independent passwords.", systemImage: "lock.doc")
+                    Label(L10n.string("Encrypted files. Independent passwords."), systemImage: "lock.doc")
                     Spacer()
-                    Text("No accounts · No servers · No sync")
+                    Text(L10n.string("No accounts · No servers · No sync"))
                 }
                 .appTextFont(.caption).foregroundStyle(.secondary)
             }
@@ -94,27 +96,27 @@ struct RootView: View {
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 26) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Your time, kept private.")
+                Text(L10n.string("Your time, kept private."))
                     .appTextFont(size: 36, weight: .semibold)
-                Text("Keep your calendars in a password-protected .kanso file. Choose where it lives and open it whenever you need it.")
+                Text(L10n.string("Keep your calendars in a password-protected .kanso file. Choose where it lives and open it whenever you need it."))
                     .appTextFont(.body).foregroundStyle(.secondary).frame(maxWidth: 600, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(alignment: .top, spacing: 18) {
-                welcomeAction(title: "Create a vault", description: "Start with a new file, your own name and a unique password.", symbol: "doc.badge.plus", primary: true, action: createKansoFile)
-                welcomeAction(title: "Open a vault", description: "Choose an existing .kanso file and unlock it with its password.", symbol: "folder", primary: false, action: openKansoFile)
+                welcomeAction(title: L10n.string("Create a vault"), description: L10n.string("Start with a new file, your own name and a unique password."), symbol: "doc.badge.plus", primary: true, action: createKansoFile)
+                welcomeAction(title: L10n.string("Open a vault"), description: L10n.string("Choose an existing .kanso file and unlock it with its password."), symbol: "folder", primary: false, action: openKansoFile)
             }
             if rememberRecentFiles {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("Recent vaults").appTextFont(.headline)
+                        Text(L10n.string("Recent vaults")).appTextFont(.headline)
                         Spacer()
                         if !recentFiles.isEmpty {
-                            Button("Clear history") { VaultRecentFiles.clear() }.buttonStyle(.link)
+                            Button(L10n.string("Clear history")) { VaultRecentFiles.clear() }.buttonStyle(.link)
                         }
                     }
                     if recentFiles.isEmpty {
-                        Text("Files you open will appear here.").foregroundStyle(.secondary)
+                        Text(L10n.string("Files you open will appear here.")).foregroundStyle(.secondary)
                     } else {
                         ForEach(recentFiles, id: \.self) { url in
                             Button {
@@ -148,9 +150,9 @@ struct RootView: View {
             Text(description).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
             if primary {
-                Button("Create Vault…", action: action).buttonStyle(.borderedProminent).controlSize(.large)
+                Button(L10n.string("Create Vault…"), action: action).buttonStyle(.borderedProminent).controlSize(.large)
             } else {
-                Button("Open Vault…", action: action).buttonStyle(.bordered).controlSize(.large)
+                Button(L10n.string("Open Vault…"), action: action).buttonStyle(.bordered).controlSize(.large)
             }
         }
         .padding(24).frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
@@ -161,8 +163,8 @@ struct RootView: View {
     private var documentGate: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(model.displayName ?? "Calendar vault").appTextFont(.largeTitle, weight: .semibold)
-                Text(model.vaultState == .notCreated ? "Choose a unique password for this vault." : "Unlock your calendars with this file’s password.")
+                Text(model.displayName ?? L10n.string("Calendar vault")).appTextFont(.largeTitle, weight: .semibold)
+                Text(model.vaultState == .notCreated ? L10n.string("Choose a unique password for this vault.") : L10n.string("Unlock your calendars with this file’s password."))
                     .foregroundStyle(.secondary)
             }
             statePanel
@@ -174,40 +176,40 @@ struct RootView: View {
     @ViewBuilder
     private var statePanel: some View {
         if model.isBusy {
-            ProgressView("Preparing encrypted storage…")
+            ProgressView(L10n.string("Preparing encrypted storage…"))
         } else {
             switch model.vaultState {
             case .notCreated:
                 VStack(alignment: .leading, spacing: 12) {
-                    SecureField("Password (at least 15 characters)", text: $model.passwordInput)
+                    SecureField(L10n.string("Password (at least 15 characters)"), text: $model.passwordInput)
                         .accessibilityIdentifier("new-vault-password")
-                    SecureField("Confirm password", text: $model.passwordConfirmation)
+                    SecureField(L10n.string("Confirm password"), text: $model.passwordConfirmation)
                         .accessibilityIdentifier("confirm-vault-password")
                         .onSubmit { if model.canCreatePassword { model.createVault() } }
-                    Text("Use a long, unique phrase. Spaces and symbols are allowed.")
+                    Text(L10n.string("Use a long, unique phrase. Spaces and symbols are allowed."))
                         .appTextFont(.caption).foregroundStyle(.secondary)
-                    Button("Create Vault", systemImage: "lock.shield") { model.createVault() }
+                    Button(L10n.string("Create Vault"), systemImage: "lock.shield") { model.createVault() }
                         .buttonStyle(.borderedProminent).controlSize(.large)
                         .disabled(!model.canCreatePassword).accessibilityIdentifier("create-vault")
                 }.textFieldStyle(.roundedBorder).frame(maxWidth: 400)
             case .locked:
                 VStack(alignment: .leading, spacing: 12) {
-                    SecureField("Vault password", text: $model.passwordInput)
+                    SecureField(L10n.string("Vault password"), text: $model.passwordInput)
                         .textFieldStyle(.roundedBorder).accessibilityIdentifier("vault-password")
                         .onSubmit { if !model.passwordInput.isEmpty { model.unlock(password: model.passwordInput) } }
-                    Button("Unlock Vault", systemImage: "lock.open") { model.unlock(password: model.passwordInput) }
+                    Button(L10n.string("Unlock Vault"), systemImage: "lock.open") { model.unlock(password: model.passwordInput) }
                         .buttonStyle(.borderedProminent).controlSize(.large)
                         .disabled(model.passwordInput.isEmpty).accessibilityIdentifier("unlock-vault")
-                    Text("You can paste a password saved in your password manager.")
+                    Text(L10n.string("You can paste a password saved in your password manager."))
                         .appTextFont(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: 400)
             case .unlocking:
-                ProgressView("Decrypting vault…")
+                ProgressView(L10n.string("Decrypting vault…"))
             case .corrupt:
-                Label("This file cannot be opened", systemImage: "exclamationmark.triangle").appTextFont(.headline)
-                Text("Choose a file created with the current version of Kansolendar.")
+                Label(L10n.string("This file cannot be opened"), systemImage: "exclamationmark.triangle").appTextFont(.headline)
+                Text(L10n.string("Choose a file created with the current version of Kansolendar."))
                     .foregroundStyle(.secondary)
-                Button("Open Another Vault…", action: openKansoFile).controlSize(.large)
+                Button(L10n.string("Open Another Vault…"), action: openKansoFile).controlSize(.large)
             case .unlocked, nil:
                 EmptyView()
             }
@@ -237,8 +239,8 @@ struct VaultPasswordView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Label("Your vault is ready", systemImage: "checkmark.shield").appTextFont(.title2, weight: .semibold)
-            Text("Keep this password somewhere safe. You can save it manually in Apple Passwords.")
+            Label(L10n.string("Your vault is ready"), systemImage: "checkmark.shield").appTextFont(.title2, weight: .semibold)
+            Text(L10n.string("Keep this password somewhere safe. You can save it manually in Apple Passwords."))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 12) {
@@ -251,31 +253,31 @@ struct VaultPasswordView: View {
                         .frame(height: 32)
                     } else {
                         Text("••••••••••••••••")
-                            .accessibilityLabel("Password hidden")
+                            .accessibilityLabel(L10n.string("Password hidden"))
                     }
                 }
                 .appTextFont(.body)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Button(model.isPasswordRevealed ? "Hide" : "Reveal", systemImage: model.isPasswordRevealed ? "eye.slash" : "eye") {
+                Button(model.isPasswordRevealed ? L10n.string("Hide") : L10n.string("Reveal"), systemImage: model.isPasswordRevealed ? "eye.slash" : "eye") {
                     model.isPasswordRevealed.toggle()
                 }
             }
             .padding(14).background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
             HStack {
-                Button("Copy Password", systemImage: "doc.on.doc") {
+                Button(L10n.string("Copy Password"), systemImage: "doc.on.doc") {
                     if let password = model.passwordToSave {
                         VaultPasswordClipboard.copy(password)
                     }
                 }.buttonStyle(.bordered)
-                Button("Open Passwords") { model.openPasswords() }.buttonStyle(.bordered)
+                Button(L10n.string("Open Passwords")) { model.openPasswords() }.buttonStyle(.bordered)
                 Spacer()
-                Button("Continue") { model.finishPasswordPresentation() }
+                Button(L10n.string("Continue")) { model.finishPasswordPresentation() }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             }
-            Text("If you forget the password, you lose access to this vault.")
+            Text(L10n.string("If you forget the password, you lose access to this vault."))
                 .appTextFont(.caption).foregroundStyle(.secondary)
         }
-        .padding(28).frame(width: 520)
+        .padding(28).frame(width: 640)
     }
 
 }

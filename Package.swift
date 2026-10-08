@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "KansolendarWorkspace",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
@@ -19,7 +20,8 @@ let package = Package(
             ],
             path: "Kansolendar/App",
             exclude: ["AppTheme.swift", "CalendarEditors.swift", "CalendarScaleViews.swift", "CalendarWorkspaceView.swift", "KansolendarApp.swift", "MonthCalendarView.swift", "RootView.swift"],
-            sources: ["VaultViewModel.swift", "VaultLifecycle.swift", "EventDateAdapter.swift", "VaultError+Presentation.swift", "VaultFilePanel.swift"]
+            sources: ["VaultViewModel.swift", "VaultLifecycle.swift", "EventDateAdapter.swift", "VaultError+Presentation.swift", "VaultFilePanel.swift", "AppLanguage.swift"],
+            resources: [.process("Resources")]
         ),
         .testTarget(name: "KansolendarAppStateTests", dependencies: ["KansolendarAppState"], path: "Tests/KansolendarAppStateTests")
     ]

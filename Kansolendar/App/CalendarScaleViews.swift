@@ -6,7 +6,7 @@ enum CalendarViewMode: String, CaseIterable, Identifiable {
     case day, week, month, year
 
     var id: Self { self }
-    var title: String { rawValue.uppercased() }
+    @MainActor var title: String { L10n.string(rawValue.uppercased()) }
     var systemImage: String {
         switch self {
         case .day: "rectangle.split.1x2"
@@ -42,7 +42,7 @@ struct CalendarModeBar: View {
                 }
                 .buttonStyle(.plain)
                 .contentShape(Rectangle())
-                .accessibilityLabel("\(option.rawValue.capitalized) view")
+                .accessibilityLabel(L10n.format("%@ view", option.title))
             }
             Spacer()
         }
@@ -73,7 +73,7 @@ struct DayCalendarView: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     if placements.isEmpty {
-                        TechEmptyState(text: "NO EVENTS / OPEN SLOT", systemImage: "waveform.path.ecg")
+                        TechEmptyState(text: L10n.string("NO EVENTS / OPEN SLOT"), systemImage: "waveform.path.ecg")
                     } else {
                         ForEach(placements) { placement in
                             TechEventCard(
@@ -94,10 +94,10 @@ struct DayCalendarView: View {
 
     private var periodHeader: some View {
         TechPeriodHeader(
-            eyebrow: "DAY / \(selectedDate.isoWeekday)",
+            eyebrow: L10n.format("DAY / %lld", Int64(selectedDate.isoWeekday)),
             title: format(selectedDate, .dateTime.weekday(.wide).month(.wide).day().year()),
-            previousLabel: "Previous day",
-            nextLabel: "Next day",
+            previousLabel: L10n.string("Previous day"),
+            nextLabel: L10n.string("Next day"),
             onPrevious: { selectedDate = (try? selectedDate.adding(days: -1)) ?? selectedDate },
             onToday: { selectedDate = .localToday },
             onNext: { selectedDate = (try? selectedDate.adding(days: 1)) ?? selectedDate },
@@ -131,10 +131,10 @@ struct WeekCalendarView: View {
     var body: some View {
         VStack(spacing: 0) {
             TechPeriodHeader(
-                eyebrow: "WEEK / \(weekNumber)",
+                eyebrow: L10n.format("WEEK / %lld", Int64(weekNumber)),
                 title: weekTitle,
-                previousLabel: "Previous week",
-                nextLabel: "Next week",
+                previousLabel: L10n.string("Previous week"),
+                nextLabel: L10n.string("Next week"),
                 onPrevious: { selectedDate = (try? selectedDate.adding(days: -7)) ?? selectedDate },
                 onToday: { selectedDate = .localToday },
                 onNext: { selectedDate = (try? selectedDate.adding(days: 7)) ?? selectedDate },
@@ -178,7 +178,7 @@ struct WeekCalendarView: View {
             Divider().overlay(isSelected ? accent : Color(nsColor: .separatorColor))
 
             if dayEvents.isEmpty {
-                Text("OPEN")
+                Text(L10n.string("OPEN"))
                     .appTextFont(.caption2)
                     .foregroundStyle(.tertiary)
                     .padding(.top, 6)
@@ -231,10 +231,10 @@ struct YearCalendarView: View {
     var body: some View {
         VStack(spacing: 0) {
             TechPeriodHeader(
-                eyebrow: "YEAR / 12 MONTHS",
+                eyebrow: L10n.string("YEAR / 12 MONTHS"),
                 title: selectedDate.year.formatted(),
-                previousLabel: "Previous year",
-                nextLabel: "Next year",
+                previousLabel: L10n.string("Previous year"),
+                nextLabel: L10n.string("Next year"),
                 onPrevious: { setYear(selectedDate.year - 1) },
                 onToday: { selectedDate = .localToday },
                 onNext: { setYear(selectedDate.year + 1) },
@@ -337,10 +337,10 @@ private struct TechPeriodHeader: View {
             }
             Spacer()
             Button(previousLabel, systemImage: "chevron.left", action: onPrevious).labelStyle(.iconOnly)
-            Button("Today", action: onToday)
+            Button(L10n.string("Today"), action: onToday)
             Button(nextLabel, systemImage: "chevron.right", action: onNext).labelStyle(.iconOnly)
             if let onCreate {
-                Button("New Event", systemImage: "plus", action: onCreate)
+                Button(L10n.string("New Event"), systemImage: "plus", action: onCreate)
                     .buttonStyle(.borderedProminent)
             }
         }
@@ -391,8 +391,8 @@ private struct TechEventCard: View {
                 }
             }
             Spacer()
-            Button("Edit", systemImage: "pencil", action: onEdit).labelStyle(.iconOnly)
-            Button("Delete", systemImage: "trash", role: .destructive, action: onDelete).labelStyle(.iconOnly)
+            Button(L10n.string("Edit"), systemImage: "pencil", action: onEdit).labelStyle(.iconOnly)
+            Button(L10n.string("Delete"), systemImage: "trash", role: .destructive, action: onDelete).labelStyle(.iconOnly)
         }
         .padding(14)
         .background(Color(nsColor: .controlBackgroundColor))
@@ -424,6 +424,7 @@ private struct TechWeekEvent: View {
     }
 }
 
+@MainActor
 private func format(_ date: CivilDate, _ style: Date.FormatStyle) -> String {
-    MonthCalendarView.foundationDate(date).formatted(style.locale(Locale(identifier: "en_US")))
+    MonthCalendarView.foundationDate(date).formatted(style.locale(L10n.locale))
 }

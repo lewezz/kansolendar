@@ -15,11 +15,11 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    var localizedName: String {
+    @MainActor var localizedName: String {
         switch self {
-        case .system: "System"
-        case .light: "Light"
-        case .dark: "Dark"
+        case .system: L10n.string("System")
+        case .light: L10n.string("Light")
+        case .dark: L10n.string("Dark")
         }
     }
 
@@ -53,15 +53,15 @@ enum AppAccent: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    var localizedName: String {
+    @MainActor var localizedName: String {
         switch self {
-        case .cyan: "Cyan"
-        case .blue: "Blue"
-        case .indigo: "Indigo"
-        case .purple: "Purple"
-        case .pink: "Pink"
-        case .orange: "Orange"
-        case .green: "Green"
+        case .cyan: L10n.string("Cyan")
+        case .blue: L10n.string("Blue")
+        case .indigo: L10n.string("Indigo")
+        case .purple: L10n.string("Purple")
+        case .pink: L10n.string("Pink")
+        case .orange: L10n.string("Orange")
+        case .green: L10n.string("Green")
         }
     }
 
@@ -86,12 +86,12 @@ enum AppFont: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
-    var localizedName: String {
+    @MainActor var localizedName: String {
         switch self {
-        case .system: "System"
-        case .serif: "Serif"
-        case .rounded: "Rounded"
-        case .monospaced: "Monospaced"
+        case .system: L10n.string("System")
+        case .serif: L10n.string("Serif")
+        case .rounded: L10n.string("Rounded")
+        case .monospaced: L10n.string("Monospaced")
         case .helveticaNeue: "Helvetica Neue"
         case .arial: "Arial"
         case .avenir: "Avenir"
@@ -175,6 +175,7 @@ private struct AppThemeModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .environment(\.locale, L10n.locale)
             .environment(\.appFont, selectedFont)
             .font(selectedFont.resolvedFont(.body))
             .tint(selectedAccent.color)
@@ -234,32 +235,37 @@ struct AppearanceSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Privacy") {
-                Toggle("Remember recent vault files", isOn: $rememberRecentFiles)
+            Section(L10n.string("Language")) {
+                AppLanguagePicker()
+                Text(L10n.string("Changes apply immediately to all windows."))
+                    .appTextFont(.caption).foregroundStyle(.secondary)
+            }
+            Section(L10n.string("Privacy")) {
+                Toggle(L10n.string("Remember recent vault files"), isOn: $rememberRecentFiles)
                     .onChange(of: rememberRecentFiles) { _, enabled in
                         if !enabled { VaultRecentFiles.clear() }
                     }
-                Text("Recent files store their names and locations outside the encrypted vault.")
+                Text(L10n.string("Recent files store their names and locations outside the encrypted vault."))
                     .appTextFont(.caption).foregroundStyle(.secondary)
-                Picker("Lock after inactivity", selection: $idleMinutes) {
+                Picker(L10n.string("Lock after inactivity"), selection: $idleMinutes) {
                     ForEach(VaultLockSettings.choices, id: \.self) { minutes in
-                        Text("\(minutes) \(minutes == 1 ? "minute" : "minutes")").tag(minutes)
+                        Text(L10n.minutes(minutes)).tag(minutes)
                     }
                 }
-                Text("Vaults also lock when the Mac locks or sleeps. Switching apps does not lock them.")
+                Text(L10n.string("Vaults also lock when the Mac locks or sleeps. Switching apps does not lock them."))
                     .appTextFont(.caption).foregroundStyle(.secondary)
             }
-            Section("Appearance") {
-                Picker("Font", selection: $font) {
+            Section(L10n.string("Appearance")) {
+                Picker(L10n.string("Font"), selection: $font) {
                     ForEach(AppFont.allCases) { option in
                         Text(option.localizedName).tag(option.rawValue)
                     }
                 }
-                Text("Calendar preview · Aa Bb Cc · 0123456789")
+                Text(L10n.string("Calendar preview · Aa Bb Cc · 0123456789"))
                     .appTextFont(.body)
                     .foregroundStyle(.secondary)
 
-                Picker("Mode", selection: $appearance) {
+                Picker(L10n.string("Mode"), selection: $appearance) {
                     ForEach(AppAppearance.allCases) { option in
                         Label(option.localizedName, systemImage: option.systemImage)
                             .tag(option.rawValue)
@@ -267,11 +273,11 @@ struct AppearanceSettingsView: View {
                 }
                 .pickerStyle(.segmented)
 
-                Text("System follows the appearance configured in macOS.")
+                Text(L10n.string("System follows the appearance configured in macOS."))
                     .appTextFont(.caption)
                     .foregroundStyle(.secondary)
 
-                LabeledContent("Accent color") {
+                LabeledContent(L10n.string("Accent color")) {
                     HStack(spacing: 12) {
                         ForEach(AppAccent.allCases) { option in
                             Button {
@@ -298,7 +304,21 @@ struct AppearanceSettingsView: View {
         }
         .formStyle(.grouped)
         .padding(8)
-        .frame(width: 470, height: 520)
-        .navigationTitle("Settings")
+        .frame(width: 540, height: 650)
+        .navigationTitle(L10n.string("Settings"))
+    }
+}
+
+struct AppLanguagePicker: View {
+    @Bindable private var localization = AppLocalization.shared
+
+    var body: some View {
+        Picker(L10n.string("Application language"), selection: $localization.language) {
+            ForEach(AppLanguage.allCases) { language in
+                Text(verbatim: language.nativeName).tag(language)
+            }
+        }
+        .pickerStyle(.menu)
+        .accessibilityIdentifier("app-language")
     }
 }

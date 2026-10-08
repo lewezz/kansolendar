@@ -22,6 +22,9 @@
 		0D000000000000000000010D /* VaultError+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D000000000000000000020D /* VaultError+Presentation.swift */; };
 		0D000000000000000000010E /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D000000000000000000020E /* AppTheme.swift */; };
 		0D000000000000000000010F /* VaultLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D000000000000000000020F /* VaultLifecycle.swift */; };
+		0D0000000000000000000110 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0000000000000000000210 /* AppLanguage.swift */; };
+		0D0000000000000000000111 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 0D0000000000000000000411 /* Localizable.strings */; };
+		0D0000000000000000000112 /* Localizable.stringsdict in Resources */ = {isa = PBXBuildFile; fileRef = 0D0000000000000000000412 /* Localizable.stringsdict */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +43,29 @@
 		0D000000000000000000020D /* VaultError+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VaultError+Presentation.swift"; sourceTree = "<group>"; };
 		0D000000000000000000020E /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		0D000000000000000000020F /* VaultLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultLifecycle.swift; sourceTree = "<group>"; };
+		0D0000000000000000000210 /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
+		0D0000000000000000000900 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "en"; path = "Resources/en.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D0000000000000000000901 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "es"; path = "Resources/es.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D0000000000000000000902 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "fr"; path = "Resources/fr.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D0000000000000000000903 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "de"; path = "Resources/de.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D0000000000000000000904 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "it"; path = "Resources/it.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D0000000000000000000905 /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt"; path = "Resources/pt.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D0000000000000000000906 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "nl"; path = "Resources/nl.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D0000000000000000000907 /* pl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pl"; path = "Resources/pl.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D0000000000000000000908 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ja"; path = "Resources/ja.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D0000000000000000000909 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ko"; path = "Resources/ko.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D000000000000000000090A /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "Resources/zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0D0000000000000000000920 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "en"; path = "Resources/en.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
+		0D0000000000000000000921 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "es"; path = "Resources/es.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
+		0D0000000000000000000922 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "fr"; path = "Resources/fr.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
+		0D0000000000000000000923 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "de"; path = "Resources/de.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
+		0D0000000000000000000924 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "it"; path = "Resources/it.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
+		0D0000000000000000000925 /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "pt"; path = "Resources/pt.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
+		0D0000000000000000000926 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "nl"; path = "Resources/nl.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
+		0D0000000000000000000927 /* pl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "pl"; path = "Resources/pl.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
+		0D0000000000000000000928 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "ja"; path = "Resources/ja.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
+		0D0000000000000000000929 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "ko"; path = "Resources/ko.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
+		0D000000000000000000092A /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "zh-Hans"; path = "Resources/zh-Hans.lproj/Localizable.stringsdict"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +115,9 @@
 				0D000000000000000000020D /* VaultError+Presentation.swift */,
 				0D000000000000000000020E /* AppTheme.swift */,
 				0D000000000000000000020F /* VaultLifecycle.swift */,
+				0D0000000000000000000210 /* AppLanguage.swift */,
+				0D0000000000000000000411 /* Localizable.strings */,
+				0D0000000000000000000412 /* Localizable.stringsdict */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -109,6 +138,45 @@
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
+
+/* Begin PBXVariantGroup section */
+		0D0000000000000000000411 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				0D0000000000000000000900 /* en */,
+				0D0000000000000000000901 /* es */,
+				0D0000000000000000000902 /* fr */,
+				0D0000000000000000000903 /* de */,
+				0D0000000000000000000904 /* it */,
+				0D0000000000000000000905 /* pt */,
+				0D0000000000000000000906 /* nl */,
+				0D0000000000000000000907 /* pl */,
+				0D0000000000000000000908 /* ja */,
+				0D0000000000000000000909 /* ko */,
+				0D000000000000000000090A /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		0D0000000000000000000412 /* Localizable.stringsdict */ = {
+			isa = PBXVariantGroup;
+			children = (
+				0D0000000000000000000920 /* en */,
+				0D0000000000000000000921 /* es */,
+				0D0000000000000000000922 /* fr */,
+				0D0000000000000000000923 /* de */,
+				0D0000000000000000000924 /* it */,
+				0D0000000000000000000925 /* pt */,
+				0D0000000000000000000926 /* nl */,
+				0D0000000000000000000927 /* pl */,
+				0D0000000000000000000928 /* ja */,
+				0D0000000000000000000929 /* ko */,
+				0D000000000000000000092A /* zh-Hans */,
+			);
+			name = Localizable.stringsdict;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin PBXNativeTarget section */
 		0D0000000000000000000501 /* Kansolendar */ = {
@@ -153,6 +221,17 @@
 			knownRegions = (
 				en,
 				Base,
+				"es",
+				"fr",
+				"de",
+				"it",
+				"pt",
+				"nl",
+				"pl",
+				"ja",
+				"ko",
+				"zh-Hans",
+
 			);
 			mainGroup = 0D0000000000000000000401;
 			minimizedProjectReferenceProxies = 1;
@@ -175,6 +254,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				0D0000000000000000000109 /* Assets.xcassets in Resources */,
+				0D0000000000000000000111 /* Localizable.strings in Resources */,
+				0D0000000000000000000112 /* Localizable.stringsdict in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -197,6 +278,7 @@
 				0D000000000000000000010D /* VaultError+Presentation.swift in Sources */,
 				0D000000000000000000010E /* AppTheme.swift in Sources */,
 				0D000000000000000000010F /* VaultLifecycle.swift in Sources */,
+				0D0000000000000000000110 /* AppLanguage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

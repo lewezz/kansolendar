@@ -7,8 +7,8 @@ enum VaultFilePanel {
 
     static func chooseKansoDestination() -> URL? {
         guard let selected = chooseDestination(
-            title: "Create Calendar Vault",
-            message: "Choose a name and location for this independent, password-protected vault file.",
+            title: L10n.string("Create Calendar Vault"),
+            message: L10n.string("Choose a name and location for this independent, password-protected vault file."),
             name: "Kansolendar",
             type: kansoType
         ) else { return nil }
@@ -16,8 +16,8 @@ enum VaultFilePanel {
         guard !FileManager.default.fileExists(atPath: url.path) else {
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = "A file already exists at that location."
-            alert.informativeText = "Choose a different name. Kansolendar will never overwrite an existing vault file."
+            alert.messageText = L10n.string("A file already exists at that location.")
+            alert.informativeText = L10n.string("Choose a different name. Kansolendar will never overwrite an existing vault file.")
             alert.runModal()
             return nil
         }
@@ -35,8 +35,8 @@ enum VaultFilePanel {
     /// Configuration is shared by the actual dialog and native-panel verification.
     static func makeKansoOpenPanel() -> (NSOpenPanel, KansoOpenPanelFilter) {
         let panel = NSOpenPanel()
-        panel.title = "Open Calendar Vault"
-        panel.message = "Choose a .kanso file. Each file has its own password."
+        panel.title = L10n.string("Open Calendar Vault")
+        panel.message = L10n.string("Choose a .kanso file. Each file has its own password.")
         panel.allowedContentTypes = [.item]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false

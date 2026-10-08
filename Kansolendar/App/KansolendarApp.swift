@@ -28,5 +28,13 @@ struct KansolendarApp: App {
             AppearanceSettingsView()
                 .appTheme()
         }
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                SettingsLink {
+                    Text(L10n.string("Settings…"))
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
     }
 }

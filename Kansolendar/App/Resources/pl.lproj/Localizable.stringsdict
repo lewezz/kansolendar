@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>duration_minutes</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld minuta</string>
+			<key>few</key>
+			<string>%lld minuty</string>
+			<key>many</key>
+			<string>%lld minut</string>
+			<key>other</key>
+			<string>%lld minut</string>
+		</dict>
+	</dict>
+	<key>event_count</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld wydarzenie</string>
+			<key>few</key>
+			<string>%lld wydarzenia</string>
+			<key>many</key>
+			<string>%lld wydarzeń</string>
+			<key>other</key>
+			<string>%lld wydarzeń</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

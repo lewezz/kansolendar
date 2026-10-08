@@ -55,35 +55,35 @@ struct CalendarWorkspaceView: View {
                         }
                         .tag(calendar.id as UUID?)
                         .contextMenu {
-                            Button("Delete Calendar", role: .destructive) {
+                            Button(L10n.string("Delete Calendar"), role: .destructive) {
                                 calendarPendingDeletion = calendar
                             }
                         }
                     }
                 } header: {
-                    Text("CALENDARS")
+                    Text(L10n.string("CALENDARS"))
                         .appTextFont(.caption2, weight: .bold)
                         .tracking(0.8)
                 }
             }
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 14) {
-                    Button("New Calendar", systemImage: "plus") {
+                    Button(L10n.string("New Calendar"), systemImage: "plus") {
                         isPresentingCalendarEditor = true
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(appAccentColor)
                     if let selectedCalendarID {
-                        Button("Show All Events", systemImage: "line.3.horizontal.decrease.circle.fill") {
+                        Button(L10n.string("Show All Events"), systemImage: "line.3.horizontal.decrease.circle.fill") {
                             self.selectedCalendarID = nil
                         }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.plain)
                         .foregroundStyle(appAccentColor)
-                        .help("Clear calendar filter")
+                        .help(L10n.string("Clear calendar filter"))
 
                         if let calendar = model.calendars.first(where: { $0.id == selectedCalendarID }) {
-                            Button("Delete Calendar", systemImage: "trash", role: .destructive) {
+                            Button(L10n.string("Delete Calendar"), systemImage: "trash", role: .destructive) {
                                 calendarPendingDeletion = calendar
                             }
                             .labelStyle(.iconOnly)
@@ -101,7 +101,7 @@ struct CalendarWorkspaceView: View {
         }
         .frame(minWidth: AppWindowLayout.minimumWidth, minHeight: 500)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .searchable(text: $searchText, placement: .toolbar, prompt: "Search by title")
+        .searchable(text: $searchText, placement: .toolbar, prompt: L10n.string("Search by title"))
         .toolbar(removing: .sidebarToggle)
         .toolbar {
             // Keep the toggle beside the sidebar, including when it is hidden.
@@ -110,7 +110,7 @@ struct CalendarWorkspaceView: View {
                     columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
                 } label: {
                     toolbarLabel(
-                        columnVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar",
+                        columnVisibility == .detailOnly ? L10n.string("Show Sidebar") : L10n.string("Hide Sidebar"),
                         symbol: "sidebar.left"
                     )
                 }
@@ -119,46 +119,46 @@ struct CalendarWorkspaceView: View {
                 Button {
                     guard let url = VaultFilePanel.chooseKansoDestination() else { return }
                     openWindow(id: "kanso-vault", value: url)
-                } label: { toolbarLabel("New Vault", symbol: "doc.badge.plus") }
+                } label: { toolbarLabel(L10n.string("New Vault"), symbol: "doc.badge.plus") }
                 Button {
                     guard let url = VaultFilePanel.chooseKansoToOpen() else { return }
                     openWindow(id: "kanso-vault", value: url)
-                } label: { toolbarLabel("Open Vault", symbol: "folder") }
+                } label: { toolbarLabel(L10n.string("Open Vault"), symbol: "folder") }
 
                 Button {
                     editorEvent = nil
                     isPresentingEventEditor = true
-                } label: { toolbarLabel("New Event", symbol: "plus") }
+                } label: { toolbarLabel(L10n.string("New Event"), symbol: "plus") }
                 .disabled(model.calendars.isEmpty)
                 .keyboardShortcut("n", modifiers: .command)
 
                 Button {
                     model.lock()
-                } label: { toolbarLabel("Lock", symbol: "lock") }
+                } label: { toolbarLabel(L10n.string("Lock"), symbol: "lock") }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
 
                 Menu {
-                    Picker("Mode", selection: $appearance) {
+                    Picker(L10n.string("Mode"), selection: $appearance) {
                         ForEach(AppAppearance.allCases) { option in
                             Label(option.localizedName, systemImage: option.systemImage)
                                 .tag(option.rawValue)
                         }
                     }
                     Divider()
-                    Picker("Accent Color", selection: $accent) {
+                    Picker(L10n.string("Accent Color"), selection: $accent) {
                         ForEach(AppAccent.allCases) { option in
                             Text(option.localizedName)
                                 .tag(option.rawValue)
                         }
                     }
                     Divider()
-                    Picker("Font", selection: $font) {
+                    Picker(L10n.string("Font"), selection: $font) {
                         ForEach(AppFont.allCases) { option in
                             Text(option.localizedName).tag(option.rawValue)
                         }
                     }
-                } label: { toolbarLabel("Appearance", symbol: selectedAppearance.systemImage) }
-                .accessibilityLabel("Change appearance")
+                } label: { toolbarLabel(L10n.string("Appearance"), symbol: selectedAppearance.systemImage) }
+                .accessibilityLabel(L10n.string("Change appearance"))
             }
         }
         .labelStyle(.titleAndIcon)
@@ -174,17 +174,17 @@ struct CalendarWorkspaceView: View {
                 preferredDate: selectedDate
             )
         }
-        .alert("Delete this event?", isPresented: deletionAlertBinding, presenting: eventPendingDeletion) { event in
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
+        .alert(L10n.string("Delete this event?"), isPresented: deletionAlertBinding, presenting: eventPendingDeletion) { event in
+            Button(L10n.string("Cancel"), role: .cancel) {}
+            Button(L10n.string("Delete"), role: .destructive) {
                 Task { _ = await model.deleteEvent(id: event.id) }
             }
         } message: { event in
-            Text("“\(event.title)” will be removed from this vault.")
+            Text(L10n.format("“%@” will be removed from this vault.", event.title))
         }
-        .alert("Delete this calendar?", isPresented: calendarDeletionAlertBinding, presenting: calendarPendingDeletion) { calendar in
-            Button("Cancel", role: .cancel) {}
-            Button("Delete Calendar", role: .destructive) {
+        .alert(L10n.string("Delete this calendar?"), isPresented: calendarDeletionAlertBinding, presenting: calendarPendingDeletion) { calendar in
+            Button(L10n.string("Cancel"), role: .cancel) {}
+            Button(L10n.string("Delete Calendar"), role: .destructive) {
                 Task {
                     if await model.deleteCalendar(id: calendar.id), selectedCalendarID == calendar.id {
                         selectedCalendarID = nil
@@ -193,7 +193,7 @@ struct CalendarWorkspaceView: View {
             }
         } message: { calendar in
             let count = model.events.filter { $0.event.calendarID == calendar.id }.count
-            Text("“\(calendar.name)” and its \(count) \(count == 1 ? "event" : "events") will be permanently deleted.")
+            Text(L10n.format("“%@” and its %@ will be permanently deleted.", calendar.name, L10n.events(count)))
         }
 
     }
@@ -206,7 +206,7 @@ struct CalendarWorkspaceView: View {
     @ViewBuilder
     private var calendarSurface: some View {
         if model.isLoadingContent {
-            ProgressView("Loading private calendar…")
+            ProgressView(L10n.string("Loading private calendar…"))
         } else {
             VStack(spacing: 0) {
                 CalendarModeBar(mode: $viewMode)
@@ -266,7 +266,7 @@ struct CalendarWorkspaceView: View {
             }
             .overlay(alignment: .bottom) {
                 if let message = model.message {
-                    Text(message)
+                    Text(L10n.string(message))
                         .appTextFont(.callout)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 9)
@@ -346,15 +346,15 @@ extension CalendarColor {
         }
     }
 
-    var localizedName: String {
+    @MainActor var localizedName: String {
         switch self {
-        case .red: "Red"
-        case .orange: "Orange"
-        case .yellow: "Yellow"
-        case .green: "Green"
-        case .blue: "Blue"
-        case .purple: "Purple"
-        case .gray: "Gray"
+        case .red: L10n.string("Red")
+        case .orange: L10n.string("Orange")
+        case .yellow: L10n.string("Yellow")
+        case .green: L10n.string("Green")
+        case .blue: L10n.string("Blue")
+        case .purple: L10n.string("Purple")
+        case .gray: L10n.string("Gray")
         }
     }
 }

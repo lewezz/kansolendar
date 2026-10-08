@@ -12,23 +12,23 @@ struct CalendarEditorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             EditorSheetHeader(
-                title: "New Calendar",
-                subtitle: "Create a distinct private event channel.",
+                title: L10n.string("New Calendar"),
+                subtitle: L10n.string("Create a distinct private event channel."),
                 systemImage: "calendar.badge.plus"
             )
 
             Divider()
 
             VStack(spacing: 16) {
-                EditorSection(title: "Identity", systemImage: "textformat") {
-                    EditorField("Name", hint: "For example: Personal, Work, or Travel") {
-                        TextField("Calendar name", text: $name)
+                EditorSection(title: L10n.string("Identity"), systemImage: "textformat") {
+                    EditorField(L10n.string("Name"), hint: L10n.string("For example: Personal, Work, or Travel")) {
+                        TextField(L10n.string("Calendar name"), text: $name)
                             .textFieldStyle(.roundedBorder)
                     }
                 }
 
-                EditorSection(title: "Color", systemImage: "paintpalette") {
-                    Picker("Calendar color", selection: $color) {
+                EditorSection(title: L10n.string("Color"), systemImage: "paintpalette") {
+                    Picker(L10n.string("Calendar color"), selection: $color) {
                         ForEach(CalendarColor.allCases, id: \.self) { option in
                             Label {
                                 Text(option.localizedName)
@@ -48,7 +48,7 @@ struct CalendarEditorSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(calendarPreviewName)
                                 .appTextFont(.headline)
-                            Text("Sidebar preview")
+                            Text(L10n.string("Sidebar preview"))
                                 .appTextFont(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -65,8 +65,8 @@ struct CalendarEditorSheet: View {
 
             HStack {
                 Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                Button("Create") {
+                Button(L10n.string("Cancel"), role: .cancel) { dismiss() }
+                Button(L10n.string("Create")) {
                     isSaving = true
                     Task {
                         if await model.createCalendar(name: name, color: color) { dismiss() }
@@ -87,7 +87,7 @@ struct CalendarEditorSheet: View {
 
     private var calendarPreviewName: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Calendar name" : trimmed
+        return trimmed.isEmpty ? L10n.string("Calendar name") : trimmed
     }
 }
 
@@ -128,8 +128,8 @@ struct EventEditorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             EditorSheetHeader(
-                title: event == nil ? "New Event" : "Edit Event",
-                subtitle: event == nil ? "Add an entry to your private timeline." : "Update this timeline entry.",
+                title: event == nil ? L10n.string("New Event") : L10n.string("Edit Event"),
+                subtitle: event == nil ? L10n.string("Add an entry to your private timeline.") : L10n.string("Update this timeline entry."),
                 systemImage: event == nil ? "calendar.badge.plus" : "calendar.badge.clock"
             )
 
@@ -137,15 +137,15 @@ struct EventEditorSheet: View {
 
             ScrollView {
                 VStack(spacing: 12) {
-                    EditorSection(title: "Details", systemImage: "text.alignleft") {
+                    EditorSection(title: L10n.string("Details"), systemImage: "text.alignleft") {
                         HStack(alignment: .top, spacing: 16) {
-                            EditorField("Title", hint: "Describe the event briefly") {
-                                TextField("Event title", text: $title)
+                            EditorField(L10n.string("Title"), hint: L10n.string("Describe the event briefly")) {
+                                TextField(L10n.string("Event title"), text: $title)
                                     .textFieldStyle(.roundedBorder)
                             }
 
-                            EditorField("Calendar") {
-                                Picker("Calendar", selection: $calendarID) {
+                            EditorField(L10n.string("Calendar")) {
+                                Picker(L10n.string("Calendar"), selection: $calendarID) {
                                     ForEach(model.calendars) { calendar in
                                         Label {
                                             Text(calendar.name)
@@ -163,24 +163,24 @@ struct EventEditorSheet: View {
                         }
                     }
 
-                    EditorSection(title: "Schedule", systemImage: "clock") {
-                        Toggle("All-day event", isOn: $isAllDay)
+                    EditorSection(title: L10n.string("Schedule"), systemImage: "clock") {
+                        Toggle(L10n.string("All-day event"), isOn: $isAllDay)
 
                         if !isAllDay {
                             HStack(alignment: .top, spacing: 16) {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text("START TIME")
+                                    Text(L10n.string("START TIME"))
                                         .appTextFont(.caption, weight: .bold)
                                         .foregroundStyle(.secondary)
-                                    TimeWheelPicker(selection: $start, accessibilityLabel: "Start Time")
+                                    TimeWheelPicker(selection: $start, accessibilityLabel: L10n.string("Start Time"))
                                 }
                                 .frame(maxWidth: .infinity)
 
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text("END TIME")
+                                    Text(L10n.string("END TIME"))
                                         .appTextFont(.caption, weight: .bold)
                                         .foregroundStyle(.secondary)
-                                    TimeWheelPicker(selection: $end, accessibilityLabel: "End Time")
+                                    TimeWheelPicker(selection: $end, accessibilityLabel: L10n.string("End Time"))
                                 }
                                 .frame(maxWidth: .infinity)
                             }
@@ -189,18 +189,18 @@ struct EventEditorSheet: View {
                         Divider()
 
                         HStack(alignment: .top, spacing: 16) {
-                            EditorField("Start Date") {
+                            EditorField(L10n.string("Start Date")) {
                                 DatePicker(
-                                    "Start Date",
+                                    L10n.string("Start Date"),
                                     selection: $start,
                                     displayedComponents: .date
                                 )
                                 .datePickerStyle(.field)
                                 .labelsHidden()
                             }
-                            EditorField("End Date") {
+                            EditorField(L10n.string("End Date")) {
                                 DatePicker(
-                                    "End Date",
+                                    L10n.string("End Date"),
                                     selection: $end,
                                     in: start...,
                                     displayedComponents: .date
@@ -211,14 +211,14 @@ struct EventEditorSheet: View {
                         }
                     }
 
-                    EditorSection(title: "Optional Data", systemImage: "info.circle") {
+                    EditorSection(title: L10n.string("Optional Data"), systemImage: "info.circle") {
                         HStack(alignment: .top, spacing: 16) {
-                            EditorField("Location") {
-                                TextField("Add location", text: $location)
+                            EditorField(L10n.string("Location")) {
+                                TextField(L10n.string("Add location"), text: $location)
                                     .textFieldStyle(.roundedBorder)
                             }
-                            EditorField("Notes") {
-                                TextField("Add notes", text: $notes, axis: .vertical)
+                            EditorField(L10n.string("Notes")) {
+                                TextField(L10n.string("Add notes"), text: $notes, axis: .vertical)
                                     .textFieldStyle(.roundedBorder)
                                     .lineLimit(2...4)
                             }
@@ -232,8 +232,8 @@ struct EventEditorSheet: View {
 
             HStack {
                 Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                Button("Save") {
+                Button(L10n.string("Cancel"), role: .cancel) { dismiss() }
+                Button(L10n.string("Save")) {
                     isSaving = true
                     Task {
                         if await model.saveEvent(
@@ -283,12 +283,12 @@ private struct TimeWheelPicker: View {
     var body: some View {
         HStack(spacing: 8) {
             TimeWheelColumn(values: Array(0..<24), selection: $hour, accent: accent)
-                .accessibilityLabel("\(accessibilityLabel) hour")
+                .accessibilityLabel(L10n.format("%@ hour", accessibilityLabel))
             Text(":")
                 .appTextFont(.title, weight: .bold)
                 .foregroundStyle(accent)
             TimeWheelColumn(values: Array(0..<60), selection: $minute, accent: accent)
-                .accessibilityLabel("\(accessibilityLabel) minute")
+                .accessibilityLabel(L10n.format("%@ minute", accessibilityLabel))
         }
         .padding(8)
         .background(Color(nsColor: .controlBackgroundColor))
